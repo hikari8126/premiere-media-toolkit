@@ -838,6 +838,43 @@ def main():
             print(f"  {d}\n    → {why}")
         raise SystemExit(3)
 
+    # ---- Gộp file TRÙNG NỘI DUNG ngay trong kế hoạch ----
+    # Dedupe ở trên chỉ so nguồn với ĐÍCH. Trong chính kế hoạch cũng có thể có
+    # nhiều file cùng nội dung: hay gặp nhất là cặp '.MP4' và '.mp4' cùng tên
+    # cùng size nằm cạnh nhau (Drive phân biệt hoa thường nên cả hai cùng tồn
+    # tại). Copy cả hai là nhân đôi dung lượng vô ích.
+    if len(copy_rows) > 1:
+        by_sz = collections.defaultdict(list)
+        for r in copy_rows:
+            if r[3] > 0:
+                by_sz[r[3]].append(r)
+        drop_map = {}          # dest bị bỏ -> dest giữ lại
+        for sz, group in by_sz.items():
+            if len(group) < 2:
+                continue
+            seen_sig = {}
+            for r in sorted(group, key=lambda x: x[0]):
+                try:
+                    g = sig(r[0])
+                except OSError:
+                    continue
+                if g in seen_sig:
+                    drop_map[r[1]] = seen_sig[g]
+                else:
+                    seen_sig[g] = r[1]
+        if drop_map:
+            freed = sum(r[3] for r in copy_rows if r[1] in drop_map)
+            copy_rows = [r for r in copy_rows if r[1] not in drop_map]
+            for row in relink_rows:
+                if row[1] in drop_map:
+                    row[1] = drop_map[row[1]]
+                    row[2] = row[2] + '+DUP'
+            bucket_bytes.clear(); bucket_files.clear()
+            for r in copy_rows:
+                bucket_bytes[r[2]] += r[3]; bucket_files[r[2]] += 1
+            print(f"[trùng trong kế hoạch] bỏ {len(drop_map)} bản sao cùng nội dung "
+                  f"→ tiết kiệm {freed/2**30:.2f} GB")
+
     stats['COPY'] = len(copy_rows)   # tính lại sau sweep + dedupe
 
     cp = outdir / 'copy_plan.csv'
