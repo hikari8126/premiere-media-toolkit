@@ -279,6 +279,15 @@ Giữ tên project nguồn (để biết mượn từ đâu) + tối đa `struct
 thư mục có nghĩa gần file nhất. Thư mục vỏ bị loại: `video(s)`, `source(s)`,
 `editing file(s)`, `project(s)`, `output(s)`, `asset(s)`.
 
+**Gộp thư mục cùng nghĩa khác tên** (`BGM` / `BGMs` / `Music`): theo bảng
+`structure.merge_aliases.groups` trong config. Mặc định `mode: on_conflict` —
+CHỈ gộp khi có từ 2 biến thể cùng tồn tại trong source; chỉ có một thì giữ
+nguyên tên gốc, vì đổi `Music` thành `BGM` khi không ai trùng là tự tiện.
+Chỉ áp cho thư mục **cấp 1**, không đụng thư mục con.
+
+⚠️ Bảng alias do USER khai, skill KHÔNG tự suy ra nhóm. Suy ra nhóm chính là
+cách `VO - MH` từng bị xếp vào `Music`.
+
 Script quét **nguyên folder** chứ không chỉ file được project tham chiếu — team
 muốn chuyển cả file hiện không dùng tới. Riêng cache Adobe (`Adobe Premiere Pro
 Audio Previews`, `Video Previews`) bị bỏ qua vì Premiere tự sinh lại; với

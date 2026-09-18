@@ -60,7 +60,46 @@
     "external_dest": "Asset/shared",
     "_external_dest": "File mượn từ project khác → vào đây, giữ nguyên đường dẫn từ 'Shared drives/'.",
     "shared_max_dirs": 2,
-    "_shared_max_dirs": "File mượn từ project khác: giữ tên project nguồn + tối đa N thư mục có nghĩa gần file nhất. Không bê nguyên đường dẫn drive (sẽ ra 8-9 cấp toàn thư mục vỏ)."
+    "_shared_max_dirs": "File mượn từ project khác: giữ tên project nguồn + tối đa N thư mục có nghĩa gần file nhất. Không bê nguyên đường dẫn drive (sẽ ra 8-9 cấp toàn thư mục vỏ).",
+    "merge_aliases": {
+      "_doc": "Gộp các thư mục cùng nghĩa nhưng khác tên (BGM/BGMs/Music...). Bảng do BẠN khai — skill không tự suy ra nhóm, vì đoán sai kiểu 'VO - MH' → 'Music' rất khó phát hiện.",
+      "enabled": true,
+      "mode": "on_conflict",
+      "_mode": "on_conflict = CHỈ gộp khi có từ 2 biến thể cùng tồn tại (an toàn, mặc định). always = luôn đổi về tên chuẩn kể cả khi chỉ có 1 biến thể.",
+      "groups": {
+        "BGM": [
+          "BGM",
+          "BGMs",
+          "Music",
+          "Musics",
+          "Nhac",
+          "Nhạc",
+          "AI BGM"
+        ],
+        "VO": [
+          "VO",
+          "Voice",
+          "Voices",
+          "Voice Over",
+          "Voice Overs",
+          "Voiceover",
+          "Voiceovers"
+        ],
+        "SFX": [
+          "SFX",
+          "Sound Effect",
+          "Sound Effects"
+        ],
+        "Image": [
+          "Image",
+          "Images",
+          "Anh",
+          "Ảnh",
+          "PNG"
+        ]
+      },
+      "_groups": "Khoá là tên chuẩn sẽ dùng ở đích. Chỉ áp cho thư mục CẤP 1 trong source, không đụng thư mục con."
+    }
   },
   "editing_file": {
     "_doc": "Chuyển kèm thư mục Editing File (autosave, masks/fills, voice, composer) — BỎ cache Adobe tự sinh lại được.",

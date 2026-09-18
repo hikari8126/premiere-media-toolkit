@@ -143,14 +143,28 @@ class Index:
         return norm(str(self.root / rel))
 
 
-def sig(path, n=1 << 20):
-    """Chữ ký nội dung: sha256 của 1MB đầu + 1MB cuối."""
+# Trên Google Drive, SEEK TỚI CUỐI file buộc Drive tải gần như cả file.
+# Một file 1 GB ở ~700 KB/s = 25 phút cho MỘT file. Nên chỉ đọc đuôi với
+# file nhỏ; file lớn thì đọc phần đầu dài hơn và đọc TUẦN TỰ.
+TAIL_LIMIT = 64 << 20          # >64 MB thì không đọc đuôi nữa
+HEAD_SMALL = 1 << 20
+HEAD_LARGE = 4 << 20
+
+
+def sig(path, verbose=False):
+    """Chữ ký nội dung: sha256 của size + phần đầu (+ phần cuối nếu file nhỏ).
+
+    Luôn gộp size vào hash, và chỉ so những file ĐÃ trùng size, nên rủi ro
+    trùng chữ ký mà khác nội dung là rất thấp.
+    """
     size = os.path.getsize(path)
     h = hashlib.sha256()
     h.update(str(size).encode())
+    big = size > TAIL_LIMIT
+    n = HEAD_LARGE if big else HEAD_SMALL
     with open(path, 'rb') as f:
         h.update(f.read(n))
-        if size > 2 * n:
+        if not big and size > 2 * n:
             f.seek(-n, 2)
             h.update(f.read(n))
     return h.hexdigest()
@@ -281,7 +295,7 @@ def group_of(dest, b_root):
 
 
 def sweep_folder(root, dest_root, skip_subdirs=(), only_non_video=False,
-                 b_index=None, label=''):
+                 b_index=None, label='', alias_map=None):
     """Quét NGUYÊN thư mục, sinh cặp (src, dest) giữ nguyên cấu trúc con.
 
     Khác với luồng theo tham chiếu: lấy cả file project không dùng tới, vì
@@ -305,7 +319,7 @@ def sweep_folder(root, dest_root, skip_subdirs=(), only_non_video=False,
                 # ghi riêng vào thư mục project của workspace đích. Copy cả hai
                 # sẽ để lại một bản .aep/.prproj cũ trỏ về đường dẫn cũ.
                 continue
-            rel = src[len(root) + 1:]
+            rel = apply_alias(src[len(root) + 1:], alias_map)
             if b_index is not None and b_index.find(src)[0]:
                 continue          # B đã có rồi, không copy lại
             out.append((src, f"{dest_root}/{rel}", label))
@@ -341,6 +355,64 @@ def find_subdir(root, names, wrappers=('Videos', 'Video', '')):
     return None
 
 
+DEFAULT_ALIAS_GROUPS = {
+    "BGM":   ["BGM", "BGMs", "Music", "Musics", "Nhac", "Nhạc", "AI BGM"],
+    "VO":    ["VO", "Voice", "Voices", "Voice Over", "Voice Overs",
+              "Voiceover", "Voiceovers", "VoiceOver"],
+    "SFX":   ["SFX", "Sound Effect", "Sound Effects", "SoundFX"],
+    "Image": ["Image", "Images", "Anh", "Ảnh", "PNG"],
+}
+
+
+def build_alias_map(a_source, cfg, verbose=True):
+    """Map 'tên thư mục viết thường' → 'tên chuẩn', CHỈ cho nhóm thực sự trùng.
+
+    Cùng một khái niệm hay nằm ở nhiều thư mục tên khác nhau (BGM / BGMs /
+    Music). Nhưng đổi tên khi KHÔNG trùng là tự tiện — 'Music' của người ta
+    thành 'BGM' mà chẳng ai yêu cầu. Nên mặc định `on_conflict`: chỉ gộp khi
+    có từ 2 biến thể trở lên cùng tồn tại.
+
+    Bảng alias do NGƯỜI DÙNG khai trong config — skill không tự suy ra nhóm.
+    """
+    ma = cfg.get('structure', {}).get('merge_aliases', {})
+    if ma.get('enabled', True) is False:
+        return {}
+    mode = ma.get('mode', 'on_conflict')
+    groups = ma.get('groups', DEFAULT_ALIAS_GROUPS)
+    try:
+        present = [d for d in os.listdir(a_source)
+                   if os.path.isdir(os.path.join(a_source, d))
+                   and not d.startswith('.')]
+    except OSError:
+        return {}
+    present_low = {d.lower(): d for d in present}
+
+    out = {}
+    for canon, variants in groups.items():
+        hits = [present_low[v.lower()] for v in variants if v.lower() in present_low]
+        if not hits:
+            continue
+        if mode == 'on_conflict' and len(hits) < 2:
+            continue                       # chỉ 1 biến thể → giữ nguyên tên gốc
+        changed = [h for h in hits if h != canon]
+        if not changed:
+            continue                       # đã đúng tên chuẩn, không cần đổi
+        for h in changed:
+            out[h.lower()] = canon
+        if verbose:
+            print(f"[gộp thư mục] {', '.join(sorted(hits))} → {canon}")
+    return out
+
+
+def apply_alias(rel, alias_map):
+    """Đổi segment ĐẦU của đường dẫn tương đối theo bảng alias."""
+    if not alias_map:
+        return rel
+    parts = rel.split('/')
+    parts[0] = alias_map.get(parts[0].lower(), parts[0])
+    return '/'.join(parts)
+
+
 def shared_dest(src, b_root, shared_root, max_dirs=2):
     """Đích cho file mượn từ project khác — NGẮN GỌN, không bê cả cây drive.
 
@@ -365,7 +437,8 @@ def shared_dest(src, b_root, shared_root, max_dirs=2):
     return norm('/'.join([b_root, shared_root] + keep + [fname]))
 
 
-def dest_for(src, ext, a_root, a_source, b_root, cfg, a_edit=None):
+def dest_for(src, ext, a_root, a_source, b_root, cfg, a_edit=None,
+             alias_map=None):
     """Đích trong B cho 1 file chưa có trong B. GIỮ NGUYÊN cấu trúc thư mục.
 
     Không phân loại lại, không đoán bucket — taxonomy của team đã có sẵn trong
@@ -401,6 +474,7 @@ def dest_for(src, ext, a_root, a_source, b_root, cfg, a_edit=None):
                 rel = rel[len(lead):]
                 break
 
+    rel = apply_alias(rel, alias_map)
     root = extra_video_dest if ext in VIDEO else non_video_dest
     return norm(f"{b_root}/{root}/{rel}")
 
@@ -511,6 +585,8 @@ def main():
     bi = Index(b_root, 'B'); print(f"B index: {bi.n:,} file")
     ai = Index(a_root, 'A'); print(f"A index: {ai.n:,} file\n")
 
+    alias_map = build_alias_map(a_source, cfg)
+
     a_edit = find_subdir(a_root, edit_names)
     if a_edit:
         print(f"editing của A: {a_edit}")
@@ -591,7 +667,8 @@ def main():
             relink_rows.append([p, '', 'DEAD', ext, srcs]); continue
 
         # 3. đích trong B/Asset
-        dest = dest_for(src, ext, a_root, a_source, b_root, cfg, a_edit)
+        dest = dest_for(src, ext, a_root, a_source, b_root, cfg, a_edit,
+                        alias_map)
         bucket = group_of(dest, b_root)
 
         if dest in seen_dest and seen_dest[dest] != src:
@@ -615,7 +692,8 @@ def main():
 
     if st.get('sweep_non_video', True):
         swept += sweep_folder(a_source, f"{b_root}/{st.get('non_video_dest','Asset')}",
-                              only_non_video=True, b_index=bi, label='sweep:source')
+                              only_non_video=True, b_index=bi, label='sweep:source',
+                              alias_map=alias_map)
 
     if ef.get('copy', True):
         if a_edit:
@@ -658,6 +736,10 @@ def main():
                 by_size[sz].append(rel)
         twin_of = {}      # src -> abs path bản trùng trong B
         bsig = {}         # cache chữ ký file B
+        n_need = sum(1 for r in copy_rows if by_size.get(r[3]))
+        if n_need:
+            print(f"[dedupe] cần đối chiếu {n_need} file có trùng size trong đích "
+                  f"(đọc phần đầu, file >64MB không đọc đuôi)")
         for r in copy_rows:
             src, size = r[0], r[3]
             cands = by_size.get(size)
