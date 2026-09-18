@@ -729,6 +729,63 @@ def main():
         print(f"\n❌ {len(dead)} tham chiếu KHÔNG cứu được (file đã bị xoá khỏi đĩa) — sẽ offline")
     print(f"\ncopy_plan:   {cp}\nrelink_map:  {rm}")
 
+    # =====================================================================
+    # BÁO CÁO CHUẨN — Claude dán NGUYÊN VĂN khối này, không viết lại.
+    # Mục đích: mọi session cho ra cùng một câu chữ, user đọc quen mắt và
+    # so sánh được giữa các lần chạy. Diễn giải lại bằng văn model thì mỗi
+    # lần một kiểu.
+    # =====================================================================
+    resolved = sum(v for k, v in stats.items()
+                   if k.startswith('IN_B') or k in ('COPY', 'PROJECT_FILE'))
+    total_refs = sum(stats.values())
+    dead = stats.get('DEAD', 0)
+    amb = len([r for r in relink_rows if 'AMBIGUOUS' in r[2]])
+    gb = sum(r[3] for r in copy_rows) / 2 ** 30
+    maxdepth = max((r[1][len(b_root) + 1:].count('/') for r in copy_rows), default=0)
+
+    print("\n" + "=" * 68)
+    print("BÁO CÁO CHUYỂN NHÀ")
+    print("=" * 68)
+    print(f"Nguồn : {a_root}")
+    print(f"Đích  : {b_root}")
+    print(f"Tham chiếu : {total_refs:,}   giải được {resolved:,}   "
+          f"chết {dead:,}")
+    print(f"Sẽ copy    : {len(copy_rows):,} file   {gb:.2f} GB   "
+          f"sâu nhất {maxdepth} cấp")
+    print("Phân bổ    : " + (", ".join(
+        f"{b} {bucket_files[b]}" for b in sorted(bucket_bytes,
+                                                 key=lambda x: -bucket_bytes[x])[:5])
+        or "(không có gì để copy)"))
+
+    flags = []
+    if dead:
+        flags.append(("MEDIA CHẾT", f"{dead:,} tham chiếu không tìm thấy file ở bất kỳ đâu",
+                      "Những file này đã offline TỪ TRƯỚC, không phải do lần chuyển này. "
+                      "Muốn cứu phải lấy từ Drive trash / version history."))
+    if amb:
+        flags.append(("KHỚP MƠ HỒ", f"{amb} tham chiếu trùng tên, đã chọn ứng viên gần nhất",
+                      "Kiểm cột status=*AMBIGUOUS* trong relink_map.csv nếu thấy nghi."))
+    if maxdepth >= 8:
+        flags.append(("CÂY SÂU", f"đích sâu tới {maxdepth} cấp",
+                      "Xem lại structure.shared_max_dirs nếu thấy thừa."))
+    if not copy_rows:
+        flags.append(("KHÔNG CÓ GÌ ĐỂ COPY", "mọi thứ đã có sẵn ở đích", ""))
+
+    if flags:
+        print("-" * 68)
+        print("CẦN LƯU Ý")
+        for name, what, note in flags:
+            print(f"  [{name}] {what}")
+            if note:
+                print(f"      → {note}")
+    else:
+        print("-" * 68)
+        print("KHÔNG CÓ BẤT THƯỜNG")
+
+    print("-" * 68)
+    print("CHƯA GHI GÌ. Xác nhận để chạy apply (copy → relink → đặt file vào đích).")
+    print("=" * 68)
+
 
 if __name__ == '__main__':
     main()

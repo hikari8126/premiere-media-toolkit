@@ -70,6 +70,42 @@ Cấu hình trong `config.json` → `guards` (xem `references/CUSTOMIZE.md`). T�
 Khi guard chặn, ĐỪNG tìm cách đi vòng. Báo user biết path nào bị chặn và hỏi họ
 muốn đổi đích thế nào.
 
+## Mẫu trả lời chuẩn — DÁN NGUYÊN VĂN
+
+`plan_relink_b.py` in ra một khối `BÁO CÁO CHUYỂN NHÀ` ở cuối. **Dán nguyên văn
+khối đó vào câu trả lời**, trong code block. Không viết lại bằng lời của mình,
+không đổi thứ tự, không thêm bớt số liệu.
+
+Lý do: cùng một kết quả thì mọi session phải cho ra cùng câu chữ. User đọc quen
+mắt, và so được giữa lần chạy này với lần trước. Model tự diễn giải thì mỗi lần
+một kiểu — cùng dữ liệu mà lần thì "khá nhiều file offline", lần thì "hầu hết
+đều ổn".
+
+Sau khối báo cáo, Claude chỉ được viết thêm **tối đa 3 câu**, và chỉ để:
+- nêu việc cần user quyết mà script không tự biết (quyền ghi, chọn phương án)
+- cảnh báo điều script chưa kiểm được
+- hỏi xác nhận apply
+
+Cấm: tóm tắt lại con số đã có trong báo cáo · đánh giá kiểu "kết quả rất tốt" ·
+thêm emoji · đổi cách gọi tên mục.
+
+### Khi báo cáo ghi "KHÔNG CÓ BẤT THƯỜNG"
+
+Trả lời đúng một câu sau khối báo cáo, nguyên văn:
+
+> Không có gì bất thường. Xác nhận thì tôi chạy apply.
+
+### Khi báo cáo có mục "CẦN LƯU Ý"
+
+Không diễn giải lại từng mục — script đã ghi rõ. Chỉ hỏi đúng những gì cần
+quyết, mỗi ý một dòng, không quá 3 dòng.
+
+### Sau khi apply
+
+Dán nguyên văn phần tổng kết của `apply_copy.py` (dòng `xong: copy N, lỗi M...`)
+và kết quả verify, rồi dùng checklist ở mục "Verification checklist" — cũng
+nguyên văn, không tự chế thêm mục.
+
 ## Quy chuẩn gửi file cho skill
 
 Phần lớn thời gian mất vào việc đoán xem thư mục nào là gì. Gửi đúng chuẩn thì
