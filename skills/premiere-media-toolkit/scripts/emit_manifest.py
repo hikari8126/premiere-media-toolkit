@@ -20,6 +20,11 @@ def main():
     ap = argparse.ArgumentParser()
     ap.add_argument('relink_map')
     ap.add_argument('-o', '--out', required=True)
+    ap.add_argument('--project-out', default=None,
+                    help='file riêng cho tham chiếu .aep/.prproj. Chúng PHẢI '
+                         'relink bằng --paths-only vì <Title> ở đó là tên comp, '
+                         'không phải tên file. Không truyền thì các dòng này bị '
+                         'LOẠI khỏi manifest chính cho an toàn.')
     ap.add_argument('--include-rel', action='store_true',
                     help='giữ cả dòng chỉ xuất hiện ở RelativePath')
     ap.add_argument('--exclude', action='append', default=[],
@@ -29,7 +34,12 @@ def main():
 
     rows = list(csv.DictReader(open(args.relink_map, encoding='utf-8')))
     out, skipped, renames, excluded = [], 0, 0, 0
+    project_rows = []
     for r in rows:
+        if r['status'] == 'PROJECT_FILE':
+            if r['new_path'] and r['old_path'] != r['new_path']:
+                project_rows.append((r['old_path'], r['new_path']))
+            continue
         if any(x in r['old_path'] for x in args.exclude):
             excluded += 1
             continue
@@ -55,6 +65,22 @@ def main():
         w = csv.writer(f)
         w.writerow(['old_path', 'new_path'])
         w.writerows(uniq)
+    if args.project_out:
+        seen_p = set(); uniq_p = []
+        for o, n in project_rows:
+            if o in seen_p:
+                continue
+            seen_p.add(o); uniq_p.append((o, n))
+        with open(args.project_out, 'w', newline='', encoding='utf-8') as f:
+            w = csv.writer(f)
+            w.writerow(['old_path', 'new_path'])
+            w.writerows(uniq_p)
+        print(f"manifest file project: {args.project_out}  ({len(uniq_p)} entry)")
+        print("  → chạy relink_premiere_v2.py với --paths-only cho file này")
+    elif project_rows:
+        print(f"CHÚ Ý: bỏ {len(project_rows)} tham chiếu .aep/.prproj khỏi manifest "
+              f"chính. Dùng --project-out để relink chúng bằng --paths-only.")
+
     print(f"manifest: {args.out}")
     print(f"  entry:            {len(uniq):,}")
     print(f"  trong đó đổi tên: {renames:,}  (pname sẽ được cập nhật theo B)")
