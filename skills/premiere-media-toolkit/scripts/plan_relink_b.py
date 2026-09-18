@@ -32,7 +32,8 @@ from pathlib import Path
 VIDEO = {'.mov', '.mp4', '.webm'}
 IMAGE = {'.png', '.jpg', '.jpeg', '.webp', '.gif', '.ai', '.psd', '.tif'}
 AUDIO = {'.mp3', '.wav', '.aif', '.aiff', '.m4a'}
-IGNORE_EXT = {'.cfa', '.pek', '.prproj', '.aep'}
+IGNORE_EXT = {'.cfa', '.pek'}           # cache Adobe, bỏ hẳn
+PROJECT_EXT = {'.aep', '.prproj'}       # file project: xử lý riêng, xem bên dưới
 
 ID_SUFFIX = re.compile(r'\s*\[[0-9a-z]{4,12}\]\s*$', re.I)
 SEP = re.compile(r'[\s_\-.]+')
@@ -287,7 +288,10 @@ def sweep_folder(root, dest_root, skip_subdirs=(), only_non_video=False,
             ext = os.path.splitext(f)[1].lower()
             if only_non_video and ext in VIDEO:
                 continue
-            if ext in IGNORE_EXT:
+            if ext in IGNORE_EXT or ext in PROJECT_EXT:
+                # file project bản gốc KHÔNG copy sang: bản đã relink được
+                # ghi riêng vào thư mục project của workspace đích. Copy cả hai
+                # sẽ để lại một bản .aep/.prproj cũ trỏ về đường dẫn cũ.
                 continue
             rel = src[len(root) + 1:]
             if b_index is not None and b_index.find(src)[0]:
@@ -441,6 +445,9 @@ def main():
         if a_edit:
             break
 
+    our_projects = {os.path.basename(x).lower()
+                    for x in list(args.prproj) + list(args.aep)}
+
     refs = {}   # path -> set(nguồn)
     for p in args.prproj:
         tags, size = extract_prproj(p)
@@ -470,6 +477,22 @@ def main():
         if ext in IGNORE_EXT:
             stats['SKIP_CACHE'] += 1
             relink_rows.append([p, '', 'SKIP_CACHE', ext, srcs]); continue
+
+        if ext in PROJECT_EXT:
+            # Premiere link sang comp AE (Dynamic Link) bằng đường dẫn .aep.
+            # File project của CHÍNH ta sẽ nằm ở thư mục project của đích sau
+            # khi relink → trỏ sang đó. File project của project KHÁC thì để
+            # nguyên: ta không relink nó, và nó vẫn nằm đúng chỗ cũ.
+            bn = p.rsplit('/', 1)[-1].lower()
+            if bn in our_projects:
+                sub = cfg.get('output', {}).get('project_subdir', 'Asset/project')
+                new_p = f"{b_root}/{sub}/{p.rsplit('/', 1)[-1]}"
+                stats['PROJECT_FILE'] += 1
+                relink_rows.append([p, new_p, 'PROJECT_FILE', ext, srcs])
+            else:
+                stats['SKIP_OTHER_PROJECT'] += 1
+                relink_rows.append([p, '', 'SKIP_OTHER_PROJECT', ext, srcs])
+            continue
 
         # 1. tìm file thật trên đĩa (để lấy size dùng cho phân giải trùng tên)
         src = None if is_rel else on_disk(p)

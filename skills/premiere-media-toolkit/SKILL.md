@@ -240,6 +240,22 @@ theo tên thư mục và nó xếp `VO - MH`, `VO - SV`, `Licenses`, `Overlay` v
 `Music` — sai mà rất khó phát hiện. Taxonomy đã nằm sẵn trong tên thư mục của
 team; việc của skill là giữ nguyên, không diễn giải lại.
 
+**File project (.aep / .prproj) được tham chiếu:**
+
+Premiere link sang comp After Effects bằng đường dẫn `.aep` (Dynamic Link).
+Đường dẫn này PHẢI được relink, nếu không Premiere vẫn mở bản AE cũ ở thư mục
+nguồn — sửa gì trong AE mới ở đích cũng không thấy.
+
+| Tham chiếu | Xử lý |
+|---|---|
+| `.aep`/`.prproj` của CHÍNH project đang xử lý | trỏ sang `<đích>/Asset/project/<tên file>` |
+| `.aep`/`.prproj` của project KHÁC | giữ nguyên — ta không relink nó, nó vẫn nằm đúng chỗ |
+| `.cfa`, `.pek` | bỏ qua, cache Adobe |
+
+Bản GỐC của file project không bao giờ được copy sang đích — bản đã relink được
+ghi riêng vào `Asset/project`. Copy cả hai sẽ để lại một file cũ trỏ về đường
+dẫn cũ, và người mở nhầm nó thì không hiểu vì sao media offline.
+
 ### 2. apply_copy.py — Thực thi copy_plan.csv
 
 Copy qua file tạm `.part` rồi `os.replace` → ngắt giữa đường không để lại file
