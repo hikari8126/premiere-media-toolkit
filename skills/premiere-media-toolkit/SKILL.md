@@ -227,8 +227,21 @@ tải nội dung về) — chạy nền, khoảng 5 phút cho 700 file.
 |---|---|
 | Không phải video (BGM, SFX, Image, VO, Licenses, Overlay...) | `Asset/<đường dẫn con giữ nguyên>` |
 | Video mà `Sources` của workspace CHƯA có | `Asset/shared/<đường dẫn con giữ nguyên>` |
-| File mượn từ project khác | `Asset/shared/<đường dẫn từ Shared drives>` |
+| File mượn từ project khác | `Asset/shared/<project nguồn>/<tối đa 2 thư mục>/<file>` |
 | `Editing File/` (autosave, fills/masks, voice, composer) | `Asset/project/Editing File/<giữ nguyên>` |
+
+⚠️ **Đừng bê nguyên đường dẫn drive vào đích.** File mượn từ project khác nếu
+giữ nguyên path từ `Shared drives/` sẽ ra 8-9 cấp mà phần lớn là tên drive và
+thư mục vỏ (`Video`, `Editing File`) — không nhận dạng được gì:
+
+```
+shared/CPM.Content Storage_Team 01/EaseMotions 2/Video/Editing File/Voice/34x/x.mp3   ← 9 cấp
+shared/EaseMotions 2/Voice/34x/x.mp3                                                  ← 5 cấp
+```
+
+Giữ tên project nguồn (để biết mượn từ đâu) + tối đa `structure.shared_max_dirs`
+thư mục có nghĩa gần file nhất. Thư mục vỏ bị loại: `video(s)`, `source(s)`,
+`editing file(s)`, `project(s)`, `output(s)`, `asset(s)`.
 
 Script quét **nguyên folder** chứ không chỉ file được project tham chiếu — team
 muốn chuyển cả file hiện không dùng tới. Riêng cache Adobe (`Adobe Premiere Pro

@@ -300,6 +300,36 @@ def sweep_folder(root, dest_root, skip_subdirs=(), only_non_video=False,
     return out
 
 
+# Thư mục "vỏ" — chỉ để tổ chức, không mang thông tin nhận dạng file.
+GENERIC_DIRS = {'video', 'videos', 'source', 'sources', 'editing file',
+                'editing files', 'project', 'projects', 'output', 'outputs',
+                'asset', 'assets'}
+
+
+def shared_dest(src, b_root, shared_root, max_dirs=2):
+    """Đích cho file mượn từ project khác — NGẮN GỌN, không bê cả cây drive.
+
+    Giữ nguyên đường dẫn từ 'Shared drives/' sẽ ra 8-9 cấp, phần lớn là tên
+    drive và thư mục vỏ ('Video', 'Editing File') chẳng nhận dạng được gì:
+
+        shared/CPM.Content Storage_Team 01/EaseMotions 2/Video/Editing File/Voice/34x/x.mp3
+
+    Rút còn: <tên project nguồn> + tối đa `max_dirs` thư mục có nghĩa gần file nhất:
+
+        shared/EaseMotions 2/Voice/34x/x.mp3
+    """
+    after = src.split('Shared drives/', 1)[-1] if 'Shared drives/' in src else src.lstrip('/')
+    parts = [x for x in after.split('/') if x]
+    fname = parts[-1]
+    mid = [x for x in parts[:-1] if x.lower() not in GENERIC_DIRS]
+    if len(mid) >= 2:
+        mid = mid[1:]              # bỏ tên drive
+    top = mid[:1]                  # project nguồn — giữ để biết mượn từ đâu
+    tail = mid[1:][-max_dirs:] if len(mid) > 1 else []
+    keep = [x for x in top + tail if x]
+    return '/'.join([b_root, shared_root] + keep + [fname])
+
+
 def dest_for(src, ext, a_root, a_source, b_root, cfg, a_edit=None):
     """Đích trong B cho 1 file chưa có trong B. GIỮ NGUYÊN cấu trúc thư mục.
 
@@ -318,9 +348,8 @@ def dest_for(src, ext, a_root, a_source, b_root, cfg, a_edit=None):
 
     inside_a = src.startswith(a_root + '/')
     if not inside_a:
-        sub = (src.split('Shared drives/')[-1] if 'Shared drives/' in src
-               else os.path.basename(src))
-        return f"{b_root}/{external_dest}/{sub}"
+        return shared_dest(src, b_root, external_dest,
+                           max_dirs=st.get('shared_max_dirs', 2))
 
     # file trong Editing File → đi chung đích với phần quét Editing File,
     # không rải vào Asset/Videos/...

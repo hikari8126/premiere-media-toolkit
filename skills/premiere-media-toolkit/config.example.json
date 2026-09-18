@@ -58,7 +58,9 @@
     "extra_video_dest": "Asset/shared",
     "_extra_video_dest": "Video mà Sources của workspace CHƯA có → vào đây, giữ nguyên đường dẫn con.",
     "external_dest": "Asset/shared",
-    "_external_dest": "File mượn từ project khác → vào đây, giữ nguyên đường dẫn từ 'Shared drives/'."
+    "_external_dest": "File mượn từ project khác → vào đây, giữ nguyên đường dẫn từ 'Shared drives/'.",
+    "shared_max_dirs": 2,
+    "_shared_max_dirs": "File mượn từ project khác: giữ tên project nguồn + tối đa N thư mục có nghĩa gần file nhất. Không bê nguyên đường dẫn drive (sẽ ra 8-9 cấp toàn thư mục vỏ)."
   },
   "editing_file": {
     "_doc": "Chuyển kèm thư mục Editing File (autosave, masks/fills, voice, composer) — BỎ cache Adobe tự sinh lại được.",
@@ -68,7 +70,7 @@
       "Adobe Premiere Pro Audio Previews",
       "Adobe Premiere Pro Video Previews"
     ],
-    "_skip_subdirs": "Cache Premiere tự sinh lại; với ProjectX chúng chiếm 7,9/11,9 GB. Thêm tên thư mục vào đây nếu muốn bỏ thêm."
+    "_skip_subdirs": "Cache Premiere tự sinh lại; với ProjectX chúng chiếm 7,9/11,9 GB. Thêm tên thư mục vào đây nếu muốn bỏ thêm. Thêm 'Fills' nếu bạn coi PNG fill của Dynamic Link là cache (Premiere sinh lại được) — với AeriSoft nó là 907 file."
   },
   "output_folder": {
     "_doc": "Thư mục Output (file đã render). Mặc định KHÔNG chuyển vì không được project tham chiếu, và cấu trúc hai bên thường lệch nhau.",
