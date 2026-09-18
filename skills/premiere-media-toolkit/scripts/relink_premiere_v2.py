@@ -193,7 +193,8 @@ def find_path_tag_in_block(block_bytes, tag_name):
 
 # === Main ===
 
-def relink(prproj_path, manifest_path, apply_changes=False, verbose=False):
+def relink(prproj_path, manifest_path, apply_changes=False, verbose=False,
+           paths_only=False):
     src = Path(prproj_path).resolve()
     if not src.exists():
         print(f"ERROR: project not found: {src}", file=sys.stderr)
@@ -261,7 +262,13 @@ def relink(prproj_path, manifest_path, apply_changes=False, verbose=False):
             old_bn = basename(old_rel)
             new_bn = basename(new_rel)
             matched_media[uid] = {'old_bn': old_bn, 'new_bn': new_bn}
-            # Title FORCEFUL update — replace whatever current Title is
+            # Title FORCEFUL update — replace whatever current Title is.
+            # paths_only: KHÔNG đụng tên. Bắt buộc dùng cho tham chiếu .aep
+            # (Dynamic Link): <Title> ở đó là TÊN COMP dạng
+            # "AeriSoft Linked Comp 03/FX.aep", ghi đè bằng basename file sẽ
+            # biến mọi comp thành "FX.aep" và mất sạch tên comp.
+            if paths_only:
+                continue
             title_re = re.compile(rb'<Title>([^<]*)</Title>')
             tm = title_re.search(block)
             if tm:
@@ -279,108 +286,114 @@ def relink(prproj_path, manifest_path, apply_changes=False, verbose=False):
     print(f"  Path-tag updates planned:     {path_updates_planned:,}")
     print(f"  Title updates planned:        {title_updates_planned:,}")
 
-    # =====================================================================
-    # PHASE B (v5 — UID-chain): rename MC/CPI display names forceful via topology.
-    # Build chain: MC UID → Clip ObjID → MediaSource ObjID → Media UID → new_bn.
-    # No basename matching → no ambiguous skip. Each clip resolves to exactly one
-    # Media regardless of name collisions (1.MOV in Nora vs Tara vs Stu).
-    # =====================================================================
+    if paths_only:
+        print('  (paths-only: bỏ qua đổi tên hiển thị, bỏ qua Phase B)')
+        mc_name_updates = cpi_name_updates = 0
 
-    # Step 1: MediaSource ObjectID → Media UID
-    ms_to_media = {}
-    for mm in MEDIASOURCE_OBJ_RE.finditer(raw):
-        obj_id = mm.group(1).decode()
-        mref = MEDIA_OBJURF_RE.search(mm.group(2))
-        if mref:
-            ms_to_media[obj_id] = mref.group(1).decode('utf-8', errors='replace')
+    if not paths_only:
+        # =====================================================================
+        # PHASE B (v5 — UID-chain): rename MC/CPI display names forceful via topology.
+        # Build chain: MC UID → Clip ObjID → MediaSource ObjID → Media UID → new_bn.
+        # No basename matching → no ambiguous skip. Each clip resolves to exactly one
+        # Media regardless of name collisions (1.MOV in Nora vs Tara vs Stu).
+        # =====================================================================
 
-    # Step 2: Clip ObjectID → MediaSource ObjectID
-    clip_to_ms = {}
-    for mm in CLIP_OBJ_RE.finditer(raw):
-        obj_id = mm.group(1).decode()
-        sref = SOURCE_REF_RE.search(mm.group(2))
-        if sref:
-            clip_to_ms[obj_id] = sref.group(1).decode()
+        # Step 1: MediaSource ObjectID → Media UID
+        ms_to_media = {}
+        for mm in MEDIASOURCE_OBJ_RE.finditer(raw):
+            obj_id = mm.group(1).decode()
+            mref = MEDIA_OBJURF_RE.search(mm.group(2))
+            if mref:
+                ms_to_media[obj_id] = mref.group(1).decode('utf-8', errors='replace')
 
-    if verbose:
-        print(f"  UID chain: MediaSource={len(ms_to_media):,}, Clip={len(clip_to_ms):,}")
+        # Step 2: Clip ObjectID → MediaSource ObjectID
+        clip_to_ms = {}
+        for mm in CLIP_OBJ_RE.finditer(raw):
+            obj_id = mm.group(1).decode()
+            sref = SOURCE_REF_RE.search(mm.group(2))
+            if sref:
+                clip_to_ms[obj_id] = sref.group(1).decode()
 
-    # Step 3: walk MasterClips, resolve to Media UID, plan Name update
-    name_re = re.compile(rb'<Name>([^<]*)</Name>')
-    mc_uid_to_newbn = {}  # MC UID → new_basename (for CPI lookup)
-    mc_count = 0
-    mc_name_updates_planned = 0
-    mc_unresolved = 0
-    for m in MASTERCLIP_BLOCK_RE.finditer(raw):
-        mc_count += 1
-        mc_uid = m.group(1).decode('utf-8', errors='replace')
-        block = m.group(2)
-        block_offset = m.start(2)
-        cref = MC_CLIPREF_RE.search(block)
-        if not cref:
-            mc_unresolved += 1
-            continue
-        clip_id = cref.group(1).decode()
-        ms_id = clip_to_ms.get(clip_id)
-        if not ms_id:
-            mc_unresolved += 1
-            continue
-        media_uid = ms_to_media.get(ms_id)
-        if not media_uid:
-            mc_unresolved += 1
-            continue
-        info = matched_media.get(media_uid)
-        if not info:
-            # Media not in manifest scope (BGMs, voiceover, etc.) — skip.
-            continue
-        new_bn = info['new_bn']
-        mc_uid_to_newbn[mc_uid] = new_bn
-        nm = name_re.search(block)
-        if not nm:
-            continue
-        name_old_enc = nm.group(1).decode('utf-8', errors='replace')
-        new_name_enc = xml_escape(new_bn)
-        old_node = f'<Name>{name_old_enc}</Name>'.encode('utf-8')
-        new_node = f'<Name>{new_name_enc}</Name>'.encode('utf-8')
-        if old_node != new_node:
-            abs_offset = block_offset + nm.start()
-            changes.append((abs_offset, old_node, new_node))
-            mc_name_updates_planned += 1
+        if verbose:
+            print(f"  UID chain: MediaSource={len(ms_to_media):,}, Clip={len(clip_to_ms):,}")
 
-    print(f"  Scanned <MasterClip> blocks:  {mc_count:,}")
-    print(f"  MC resolved to Media:         {len(mc_uid_to_newbn):,}")
-    print(f"  MC Name updates planned:      {mc_name_updates_planned:,}")
-    if mc_unresolved and verbose:
-        print(f"  MC unresolved chain:          {mc_unresolved:,}")
+        # Step 3: walk MasterClips, resolve to Media UID, plan Name update
+        # (bỏ qua hoàn toàn khi paths_only)
+        name_re = re.compile(rb'<Name>([^<]*)</Name>')
+        mc_uid_to_newbn = {}  # MC UID → new_basename (for CPI lookup)
+        mc_count = 0
+        mc_name_updates_planned = 0
+        mc_unresolved = 0
+        for m in MASTERCLIP_BLOCK_RE.finditer(raw):
+            mc_count += 1
+            mc_uid = m.group(1).decode('utf-8', errors='replace')
+            block = m.group(2)
+            block_offset = m.start(2)
+            cref = MC_CLIPREF_RE.search(block)
+            if not cref:
+                mc_unresolved += 1
+                continue
+            clip_id = cref.group(1).decode()
+            ms_id = clip_to_ms.get(clip_id)
+            if not ms_id:
+                mc_unresolved += 1
+                continue
+            media_uid = ms_to_media.get(ms_id)
+            if not media_uid:
+                mc_unresolved += 1
+                continue
+            info = matched_media.get(media_uid)
+            if not info:
+                # Media not in manifest scope (BGMs, voiceover, etc.) — skip.
+                continue
+            new_bn = info['new_bn']
+            mc_uid_to_newbn[mc_uid] = new_bn
+            nm = name_re.search(block)
+            if not nm:
+                continue
+            name_old_enc = nm.group(1).decode('utf-8', errors='replace')
+            new_name_enc = xml_escape(new_bn)
+            old_node = f'<Name>{name_old_enc}</Name>'.encode('utf-8')
+            new_node = f'<Name>{new_name_enc}</Name>'.encode('utf-8')
+            if old_node != new_node:
+                abs_offset = block_offset + nm.start()
+                changes.append((abs_offset, old_node, new_node))
+                mc_name_updates_planned += 1
 
-    # Step 4: walk ClipProjectItems, resolve via MC UID, plan Name update
-    cpi_count = 0
-    cpi_name_updates_planned = 0
-    for m in CLIPPROJECTITEM_BLOCK_RE.finditer(raw):
-        cpi_count += 1
-        block = m.group(2)
-        block_offset = m.start(2)
-        mcref = CPI_MCREF_RE.search(block)
-        if not mcref:
-            continue
-        mc_uid = mcref.group(1).decode('utf-8', errors='replace')
-        new_bn = mc_uid_to_newbn.get(mc_uid)
-        if not new_bn:
-            continue
-        nm = name_re.search(block)
-        if not nm:
-            continue
-        name_old_enc = nm.group(1).decode('utf-8', errors='replace')
-        new_name_enc = xml_escape(new_bn)
-        old_node = f'<Name>{name_old_enc}</Name>'.encode('utf-8')
-        new_node = f'<Name>{new_name_enc}</Name>'.encode('utf-8')
-        if old_node != new_node:
-            abs_offset = block_offset + nm.start()
-            changes.append((abs_offset, old_node, new_node))
-            cpi_name_updates_planned += 1
+        print(f"  Scanned <MasterClip> blocks:  {mc_count:,}")
+        print(f"  MC resolved to Media:         {len(mc_uid_to_newbn):,}")
+        print(f"  MC Name updates planned:      {mc_name_updates_planned:,}")
+        if mc_unresolved and verbose:
+            print(f"  MC unresolved chain:          {mc_unresolved:,}")
 
-    print(f"  Scanned <ClipProjectItem>:    {cpi_count:,}")
-    print(f"  CPI Name updates planned:     {cpi_name_updates_planned:,}")
+        # Step 4: walk ClipProjectItems, resolve via MC UID, plan Name update
+        cpi_count = 0
+        cpi_name_updates_planned = 0
+        for m in CLIPPROJECTITEM_BLOCK_RE.finditer(raw):
+            cpi_count += 1
+            block = m.group(2)
+            block_offset = m.start(2)
+            mcref = CPI_MCREF_RE.search(block)
+            if not mcref:
+                continue
+            mc_uid = mcref.group(1).decode('utf-8', errors='replace')
+            new_bn = mc_uid_to_newbn.get(mc_uid)
+            if not new_bn:
+                continue
+            nm = name_re.search(block)
+            if not nm:
+                continue
+            name_old_enc = nm.group(1).decode('utf-8', errors='replace')
+            new_name_enc = xml_escape(new_bn)
+            old_node = f'<Name>{name_old_enc}</Name>'.encode('utf-8')
+            new_node = f'<Name>{new_name_enc}</Name>'.encode('utf-8')
+            if old_node != new_node:
+                abs_offset = block_offset + nm.start()
+                changes.append((abs_offset, old_node, new_node))
+                cpi_name_updates_planned += 1
+
+        print(f"  Scanned <ClipProjectItem>:    {cpi_count:,}")
+        print(f"  CPI Name updates planned:     {cpi_name_updates_planned:,}")
 
     # =====================================================================
     # Report
@@ -463,9 +476,14 @@ def main():
     p.add_argument('prproj')
     p.add_argument('manifest')
     p.add_argument('--apply', action='store_true')
+    p.add_argument('--paths-only', action='store_true',
+                   help='CHỈ đổi đường dẫn, KHÔNG đụng tên hiển thị. Bắt buộc '
+                        'cho tham chiếu .aep/.prproj (Dynamic Link) vì Title ở '
+                        'đó là tên comp, không phải tên file.')
     p.add_argument('--verbose', '-v', action='store_true')
     args = p.parse_args()
-    relink(args.prproj, args.manifest, apply_changes=args.apply, verbose=args.verbose)
+    relink(args.prproj, args.manifest, apply_changes=args.apply,
+           verbose=args.verbose, paths_only=args.paths_only)
 
 if __name__ == '__main__':
     main()

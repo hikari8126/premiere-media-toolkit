@@ -252,6 +252,12 @@ nguồn — sửa gì trong AE mới ở đích cũng không thấy.
 | `.aep`/`.prproj` của project KHÁC | giữ nguyên — ta không relink nó, nó vẫn nằm đúng chỗ |
 | `.cfa`, `.pek` | bỏ qua, cache Adobe |
 
+⚠️ **Relink đường dẫn .aep PHẢI dùng `relink_premiere_v2.py --paths-only`.**
+Với Dynamic Link, `<Title>` của Media là **tên comp** (`AeriSoft Linked Comp 03/FX.aep`),
+không phải tên file. Chế độ forceful mặc định sẽ ghi đè nó thành `FX.aep` và
+**mọi comp mất sạch tên** — đã xảy ra thật: 56 comp bị đổi thành cùng một tên.
+`--paths-only` chỉ đổi đường dẫn, bỏ qua Title và bỏ qua cả Phase B.
+
 Bản GỐC của file project không bao giờ được copy sang đích — bản đã relink được
 ghi riêng vào `Asset/project`. Copy cả hai sẽ để lại một file cũ trỏ về đường
 dẫn cũ, và người mở nhầm nó thì không hiểu vì sao media offline.
@@ -296,6 +302,9 @@ Sau khi organize, dùng manifest CSV để update .prproj:
 Usage:
 ```
 python3 scripts/relink_premiere_v2.py <project.prproj> <manifest.csv> [--apply] [-v]
+
+# CHỈ đổi đường dẫn, không đụng tên hiển thị — dùng cho tham chiếu .aep/.prproj
+python3 scripts/relink_premiere_v2.py <project.prproj> <manifest_project.csv> --paths-only --apply
 ```
 
 Default = dry-run. Output:
@@ -367,6 +376,7 @@ python3 scripts/build_move_manifest.py <A_root> <B_root> -o manifest.csv [--ext 
 5. apply_copy.py --apply          → copy vào B/Asset/<bucket>/
 6. emit_manifest.py               → manifest_relink.csv
 7. relink_premiere_v2.py --apply  → đổi ppath + pname theo B
+7b. relink_premiere_v2.py --paths-only --apply  → đổi đường dẫn .aep (Dynamic Link)
 8. fix_residual_prproj.py --apply → vá SubClip/ClipName/RelativePath
 8. relink_aep.py --apply          → đổi footage path + tên theo B
 9. Đặt file .RELINKED vào `Asset/project` của workspace đích, mở verify.
