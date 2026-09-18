@@ -41,7 +41,19 @@ PATH_TAG = re.compile(rb'<(ActualMediaFilePath|FilePath|RelativePath)>([^<]+)</\
 
 
 def norm(s):
-    return unicodedata.normalize('NFC', s.replace('\\', '/'))
+    """NFC + dấu / + rút gọn '..' và './'.
+
+    Bắt buộc rút gọn: .prproj chứa cả path tương đối kiểu
+    'Voice Over/8x/../../../Sources/Douyin/x.mp4'. Ghép thẳng vào đích sẽ ra
+    'Asset/project/Editing File/Voice Over/8x/../../../Sources/...' — hệ điều
+    hành tự giải khi copy nên file rơi vào chỗ khác mà KHÔNG báo lỗi.
+    """
+    s = unicodedata.normalize('NFC', s.replace('\\', '/'))
+    if '/./' in s or '/../' in s or s.endswith(('/.', '/..')):
+        collapsed = os.path.normpath(s)
+        # normpath làm mất '//' ở đầu (UNC) — không dùng ở đây, nhưng giữ an toàn
+        s = collapsed.replace('\\', '/')
+    return s
 
 
 def unescape(s):
@@ -306,6 +318,29 @@ GENERIC_DIRS = {'video', 'videos', 'source', 'sources', 'editing file',
                 'asset', 'assets'}
 
 
+def find_subdir(root, names, wrappers=('Videos', 'Video', '')):
+    """Dò thư mục con theo danh sách tên, không phân biệt hoa thường.
+
+    Mỗi team đặt tên một kiểu: Videos/Source, Video/Sources, Source/,
+    Footage/... Hardcode một kiểu là trượt ở project tiếp theo.
+    Trả về đường dẫn thật (giữ nguyên hoa thường trên đĩa) hoặc None.
+    """
+    for wrap in wrappers:
+        base = os.path.join(root, wrap) if wrap else root
+        if not os.path.isdir(base):
+            continue
+        try:
+            entries = os.listdir(base)
+        except OSError:
+            continue
+        low = {e.lower(): e for e in entries}
+        for n in names:
+            hit = low.get(n.lower())
+            if hit and os.path.isdir(os.path.join(base, hit)):
+                return norm(os.path.join(base, hit))
+    return None
+
+
 def shared_dest(src, b_root, shared_root, max_dirs=2):
     """Đích cho file mượn từ project khác — NGẮN GỌN, không bê cả cây drive.
 
@@ -327,7 +362,7 @@ def shared_dest(src, b_root, shared_root, max_dirs=2):
     top = mid[:1]                  # project nguồn — giữ để biết mượn từ đâu
     tail = mid[1:][-max_dirs:] if len(mid) > 1 else []
     keep = [x for x in top + tail if x]
-    return '/'.join([b_root, shared_root] + keep + [fname])
+    return norm('/'.join([b_root, shared_root] + keep + [fname]))
 
 
 def dest_for(src, ext, a_root, a_source, b_root, cfg, a_edit=None):
@@ -355,7 +390,7 @@ def dest_for(src, ext, a_root, a_source, b_root, cfg, a_edit=None):
     # không rải vào Asset/Videos/...
     if a_edit and src.startswith(a_edit + '/'):
         ed = cfg.get('editing_file', {}).get('dest', 'Asset/project/Editing File')
-        return f"{b_root}/{ed}/{src[len(a_edit) + 1:]}"
+        return norm(f"{b_root}/{ed}/{src[len(a_edit) + 1:]}")
 
     if src.startswith(a_source + '/'):
         rel = src[len(a_source) + 1:]
@@ -367,7 +402,7 @@ def dest_for(src, ext, a_root, a_source, b_root, cfg, a_edit=None):
                 break
 
     root = extra_video_dest if ext in VIDEO else non_video_dest
-    return f"{b_root}/{root}/{rel}"
+    return norm(f"{b_root}/{root}/{rel}")
 
 
 def strip_leading(rel, drops):
@@ -458,21 +493,27 @@ def main():
 
     a_root = norm(str(Path(a_in).resolve()))
     b_root = norm(str(Path(b_in).resolve()))
-    a_source = a_root + '/Videos/Source'
+    ps = cfg.get('project_structure', {})
+    src_names = ps.get('source_dir_names', ['Source', 'Sources'])
+    edit_names = ps.get('editing_dir_names',
+                        ['Editing File', 'Editing Files', 'Project', 'Editing'])
+    a_source = find_subdir(a_root, src_names)
+    if not a_source:
+        raise SystemExit(
+            f"ERROR: không tìm thấy thư mục source trong A.\n"
+            f"  A = {a_root}\n"
+            f"  đã thử: {src_names} (trong A, A/Videos, A/Video)\n"
+            f"  → thêm tên thư mục vào config project_structure.source_dir_names")
+    print(f"source của A: {a_source}")
     outdir = Path(args.outdir); outdir.mkdir(parents=True, exist_ok=True)
 
     print(f"A = {a_root}\nB = {b_root}\n")
     bi = Index(b_root, 'B'); print(f"B index: {bi.n:,} file")
     ai = Index(a_root, 'A'); print(f"A index: {ai.n:,} file\n")
 
-    a_edit = None
-    for name in ('Editing File', 'Editing Files', 'Project', 'Editing'):
-        for cand in (os.path.join(a_root, 'Videos', name), os.path.join(a_root, name)):
-            if os.path.isdir(cand):
-                a_edit = norm(cand)
-                break
-        if a_edit:
-            break
+    a_edit = find_subdir(a_root, edit_names)
+    if a_edit:
+        print(f"editing của A: {a_edit}")
 
     our_projects = {os.path.basename(x).lower()
                     for x in list(args.prproj) + list(args.aep)}

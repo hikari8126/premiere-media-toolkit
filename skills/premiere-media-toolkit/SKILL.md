@@ -538,6 +538,17 @@ lên 608 — nội dung bị nhân bản vì chunk được emit nhiều lần q
 một lượt duy nhất, có kiểm tra `len(output) == len(input) + tổng delta path`
 làm assert, và test trên .aep có folder lồng nhiều cấp trước khi tin.
 
+- **Tên thư mục KHÁC NHAU giữa các project.** `Videos/Source` (project này) vs
+  `Video/Sources` (project kia) vs `Source/` ngay ở gốc. Hardcode một kiểu là
+  trượt ngay ở project thứ hai. Dò theo `project_structure.source_dir_names` /
+  `editing_dir_names`, không phân biệt hoa thường, thử cả trong `Videos/`,
+  `Video/` và gốc. Không thấy thì DỪNG và báo user, đừng đoán.
+- **RÚT GỌN `..` TRƯỚC KHI GHÉP ĐÍCH.** .prproj chứa path kiểu
+  `Voice Over/8x/../../../Sources/Douyin/x.mp4`. Ghép thẳng vào đích sẽ ra
+  `Asset/project/Editing File/Voice Over/8x/../../../Sources/...`; hệ điều hành
+  tự giải `..` khi copy nên file rơi vào thư mục khác **mà không báo lỗi gì**.
+  `os.path.normpath` cho cả path nguồn lẫn đích.
+
 ### Pitfall chung
 
 - **OOM trên file lớn**: `relink_premiere_v2.py` MUST dùng streaming bytes (đã built-in). Đừng refactor sang ElementTree — sẽ crash trên .prproj > 500MB.
