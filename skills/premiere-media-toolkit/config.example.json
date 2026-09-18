@@ -64,8 +64,8 @@
     "merge_aliases": {
       "_doc": "Gộp các thư mục cùng nghĩa nhưng khác tên (BGM/BGMs/Music...). Bảng do BẠN khai — skill không tự suy ra nhóm, vì đoán sai kiểu 'VO - MH' → 'Music' rất khó phát hiện.",
       "enabled": true,
-      "mode": "on_conflict",
-      "_mode": "on_conflict = CHỈ gộp khi có từ 2 biến thể cùng tồn tại (an toàn, mặc định). always = luôn đổi về tên chuẩn kể cả khi chỉ có 1 biến thể.",
+      "mode": "always",
+      "_mode": "always = LUÔN đổi về tên chuẩn (mặc định) → mọi project ra cùng một kiểu thư mục, bất kể team để asset ở Source hay Editing File. on_conflict = chỉ gộp khi có từ 2 biến thể cùng tồn tại (giữ nguyên tên gốc khi không trùng).",
       "groups": {
         "BGM": [
           "BGM",
@@ -109,7 +109,20 @@
       "Adobe Premiere Pro Audio Previews",
       "Adobe Premiere Pro Video Previews"
     ],
-    "_skip_subdirs": "Cache Premiere tự sinh lại; với ProjectX chúng chiếm 7,9/11,9 GB. Thêm tên thư mục vào đây nếu muốn bỏ thêm. Thêm 'Fills' nếu bạn coi PNG fill của Dynamic Link là cache (Premiere sinh lại được) — với AeriSoft nó là 907 file."
+    "_skip_subdirs": "Cache Premiere tự sinh lại; với ProjectX chúng chiếm 7,9/11,9 GB. Thêm tên thư mục vào đây nếu muốn bỏ thêm. Thêm 'Fills' nếu bạn coi PNG fill của Dynamic Link là cache (Premiere sinh lại được) — với AeriSoft nó là 907 file.",
+    "system_subdirs": [
+      "Adobe Premiere Pro Audio Previews",
+      "Adobe Premiere Pro Video Previews",
+      "Adobe Premiere Pro Auto-Save",
+      "Adobe Premiere Pro Preview Files",
+      "Adobe After Effects Auto-Save",
+      "Animation Composer",
+      "Premiere Composer Files",
+      "Motion Graphics Template Media",
+      "Fills",
+      "xmlcut"
+    ],
+    "_system_subdirs": "Thư mục do Premiere/AE TỰ SINH — giữ trong thư mục project. Mọi thứ CÒN LẠI trong Editing File (BGM, VO, Element, Clips...) được coi là asset và đưa ra Asset/ y như thể nằm trong Source. Nhờ vậy team để asset ở Source hay ở Editing File thì sau chuyển nhà cũng ra CÙNG MỘT kiểu thư mục."
   },
   "output_folder": {
     "_doc": "Thư mục Output (file đã render). Mặc định KHÔNG chuyển vì không được project tham chiếu, và cấu trúc hai bên thường lệch nhau.",

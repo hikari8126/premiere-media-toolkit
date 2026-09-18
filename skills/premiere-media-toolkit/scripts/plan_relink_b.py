@@ -295,7 +295,7 @@ def group_of(dest, b_root):
 
 
 def sweep_folder(root, dest_root, skip_subdirs=(), only_non_video=False,
-                 b_index=None, label='', alias_map=None):
+                 b_index=None, label='', alias_map=None, subdirs_only=False):
     """Quét NGUYÊN thư mục, sinh cặp (src, dest) giữ nguyên cấu trúc con.
 
     Khác với luồng theo tham chiếu: lấy cả file project không dùng tới, vì
@@ -319,7 +319,12 @@ def sweep_folder(root, dest_root, skip_subdirs=(), only_non_video=False,
                 # ghi riêng vào thư mục project của workspace đích. Copy cả hai
                 # sẽ để lại một bản .aep/.prproj cũ trỏ về đường dẫn cũ.
                 continue
-            rel = apply_alias(src[len(root) + 1:], alias_map)
+            rel = src[len(root) + 1:]
+            if subdirs_only and '/' not in rel:
+                # file lẻ ngay gốc (vd .prin, .prproj) thuộc về thư mục
+                # project, không phải asset — để pass kia lo
+                continue
+            rel = apply_alias(rel, alias_map)
             if b_index is not None and b_index.find(src)[0]:
                 continue          # B đã có rồi, không copy lại
             out.append((src, f"{dest_root}/{rel}", label))
@@ -355,6 +360,22 @@ def find_subdir(root, names, wrappers=('Videos', 'Video', '')):
     return None
 
 
+# Thư mục do Premiere/AE TỰ SINH — đồ nghề, không phải source. Giữ trong thư
+# mục project. Mọi thứ CÒN LẠI trong Editing File đều coi là asset và được đưa
+# ra Asset/ như thể nó nằm trong Source.
+DEFAULT_SYSTEM_SUBDIRS = [
+    "Adobe Premiere Pro Audio Previews",
+    "Adobe Premiere Pro Video Previews",
+    "Adobe Premiere Pro Auto-Save",
+    "Adobe Premiere Pro Preview Files",
+    "Adobe After Effects Auto-Save",
+    "Animation Composer",
+    "Premiere Composer Files",
+    "Motion Graphics Template Media",
+    "Fills",
+    "xmlcut",
+]
+
 DEFAULT_ALIAS_GROUPS = {
     "BGM":   ["BGM", "BGMs", "Music", "Musics", "Nhac", "Nhạc", "AI BGM"],
     "VO":    ["VO", "Voice", "Voices", "Voice Over", "Voice Overs",
@@ -364,27 +385,35 @@ DEFAULT_ALIAS_GROUPS = {
 }
 
 
-def build_alias_map(a_source, cfg, verbose=True):
+def build_alias_map(roots, cfg, verbose=True):
     """Map 'tên thư mục viết thường' → 'tên chuẩn', CHỈ cho nhóm thực sự trùng.
 
     Cùng một khái niệm hay nằm ở nhiều thư mục tên khác nhau (BGM / BGMs /
-    Music). Nhưng đổi tên khi KHÔNG trùng là tự tiện — 'Music' của người ta
-    thành 'BGM' mà chẳng ai yêu cầu. Nên mặc định `on_conflict`: chỉ gộp khi
-    có từ 2 biến thể trở lên cùng tồn tại.
+    Music), và mỗi người trong team lại để ở chỗ khác nhau (Source hay
+    Editing File). Mặc định `always`: luôn đổi về tên chuẩn, để MỌI project
+    sau chuyển nhà đều ra cùng một kiểu thư mục.
+
+    `on_conflict` chỉ gộp khi có từ 2 biến thể cùng tồn tại — dùng khi muốn
+    giữ nguyên tên gốc của từng project.
 
     Bảng alias do NGƯỜI DÙNG khai trong config — skill không tự suy ra nhóm.
     """
     ma = cfg.get('structure', {}).get('merge_aliases', {})
     if ma.get('enabled', True) is False:
         return {}
-    mode = ma.get('mode', 'on_conflict')
+    mode = ma.get('mode', 'always')
     groups = ma.get('groups', DEFAULT_ALIAS_GROUPS)
-    try:
-        present = [d for d in os.listdir(a_source)
-                   if os.path.isdir(os.path.join(a_source, d))
-                   and not d.startswith('.')]
-    except OSError:
-        return {}
+    if isinstance(roots, str):
+        roots = [roots]
+    present = []
+    for r in roots:
+        if not r:
+            continue
+        try:
+            present += [d for d in os.listdir(r)
+                        if os.path.isdir(os.path.join(r, d)) and not d.startswith('.')]
+        except OSError:
+            continue
     present_low = {d.lower(): d for d in present}
 
     out = {}
@@ -459,11 +488,24 @@ def dest_for(src, ext, a_root, a_source, b_root, cfg, a_edit=None,
         return shared_dest(src, b_root, external_dest,
                            max_dirs=st.get('shared_max_dirs', 2))
 
-    # file trong Editing File → đi chung đích với phần quét Editing File,
-    # không rải vào Asset/Videos/...
+    # Trong Editing File có LẪN hai thứ:
+    #   - đồ nghề Premiere/AE tự sinh (auto-save, previews, composer...) → giữ
+    #     trong thư mục project
+    #   - asset thật mà người dùng để ở đó (BGM, VO, Element...) → đưa ra
+    #     Asset/ y như thể nó nằm trong Source
+    # Nhờ vậy dù team để asset ở Source hay ở Editing File, sau chuyển nhà
+    # cũng ra CÙNG MỘT kiểu thư mục.
     if a_edit and src.startswith(a_edit + '/'):
-        ed = cfg.get('editing_file', {}).get('dest', 'Asset/project/Editing File')
-        return norm(f"{b_root}/{ed}/{src[len(a_edit) + 1:]}")
+        rel_e = src[len(a_edit) + 1:]
+        first = rel_e.split('/')[0]
+        sysdirs = [d.lower() for d in cfg.get('editing_file', {}).get(
+            'system_subdirs', DEFAULT_SYSTEM_SUBDIRS)]
+        if '/' not in rel_e or first.lower() in sysdirs:
+            ed = cfg.get('editing_file', {}).get('dest', 'Asset/project/Editing File')
+            return norm(f"{b_root}/{ed}/{rel_e}")
+        rel_e = apply_alias(rel_e, alias_map)
+        root = extra_video_dest if ext in VIDEO else non_video_dest
+        return norm(f"{b_root}/{root}/{rel_e}")
 
     if src.startswith(a_source + '/'):
         rel = src[len(a_source) + 1:]
@@ -585,11 +627,10 @@ def main():
     bi = Index(b_root, 'B'); print(f"B index: {bi.n:,} file")
     ai = Index(a_root, 'A'); print(f"A index: {ai.n:,} file\n")
 
-    alias_map = build_alias_map(a_source, cfg)
-
     a_edit = find_subdir(a_root, edit_names)
     if a_edit:
         print(f"editing của A: {a_edit}")
+    alias_map = build_alias_map([a_source, a_edit], cfg)
 
     our_projects = {os.path.basename(x).lower()
                     for x in list(args.prproj) + list(args.aep)}
@@ -700,9 +741,23 @@ def main():
             skip = ef.get('skip_subdirs', [
                 'Adobe Premiere Pro Audio Previews',
                 'Adobe Premiere Pro Video Previews'])
+            sysdirs = ef.get('system_subdirs', DEFAULT_SYSTEM_SUBDIRS)
+            # đồ nghề → giữ trong thư mục project
             swept += sweep_folder(a_edit,
                                   f"{b_root}/{ef.get('dest','Asset/project/Editing File')}",
-                                  skip_subdirs=skip, label='sweep:editing')
+                                  skip_subdirs=skip + [d for d in
+                                                       os.listdir(a_edit)
+                                                       if os.path.isdir(os.path.join(a_edit, d))
+                                                       and d.lower() not in
+                                                       [x.lower() for x in sysdirs]],
+                                  label='sweep:editing')
+            # asset để nhầm trong Editing File → ra Asset/ như source
+            swept += sweep_folder(a_edit,
+                                  f"{b_root}/{st.get('non_video_dest','Asset')}",
+                                  skip_subdirs=skip + list(sysdirs),
+                                  only_non_video=True, b_index=bi,
+                                  label='sweep:editing-asset', alias_map=alias_map,
+                                  subdirs_only=True)
             print(f"quét Editing File: {a_edit}")
             print(f"  bỏ qua cache: {', '.join(skip)}")
 
