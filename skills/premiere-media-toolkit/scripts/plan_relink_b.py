@@ -22,6 +22,8 @@ import gzip
 import json
 import os
 import re
+import sys as _sys, os as _os
+_sys.path.insert(0, _os.path.dirname(_os.path.abspath(__file__)))
 import guard
 import hashlib
 import unicodedata
@@ -192,6 +194,9 @@ def load_config(path):
     return cfg
 
 
+DEFAULT_B_MARKERS = ['samx']
+
+
 def detect_roles(roots, cfg):
     """Nhận diện path nào là A (nguồn) và B (đích) theo marker trong config.
 
@@ -199,13 +204,15 @@ def detect_roles(roots, cfg):
     copy ngược chiều: ghi dữ liệu cũ đè lên thư mục đã organize.
     """
     rd = cfg.get('role_detection', {})
-    bm = [x.lower() for x in rd.get('b_markers', [])]
+    bm = [x.lower() for x in rd.get('b_markers', DEFAULT_B_MARKERS)]
     am = [x.lower() for x in rd.get('a_markers', [])]
     if len(roots) != 2:
         raise SystemExit(f"ERROR: --root cần đúng 2 đường dẫn, đang có {len(roots)}")
     if not bm and not am:
-        raise SystemExit("ERROR: config không có role_detection.b_markers/a_markers "
+        raise SystemExit("ERROR: role_detection.b_markers rỗng trong config "
                          "→ không tự nhận diện được. Dùng --a-root/--b-root.")
+    if not cfg:
+        print(f"(chưa có config.json — dùng marker mặc định: {bm})")
 
     def hits(path, markers):
         low = path.lower()
