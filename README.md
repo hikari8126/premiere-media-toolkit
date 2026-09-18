@@ -7,14 +7,51 @@ Sinh ra từ nhu cầu thật: một thư mục dự án được nhân bản sa
 organize lại theo cấu trúc khác, còn `.prproj` (1 GB) và `.aep` thì vẫn trỏ về
 đường dẫn cũ.
 
-## Cài
+## Cài — chọn 1 trong 3 cách
+
+### Cách 1: nhờ Claude cài hộ (dễ nhất, không cần nhớ lệnh)
+
+Mở Claude Code, nhắn đúng câu này:
+
+> Cài giúp tôi skill ở https://github.com/hikari8126/premiere-media-toolkit
+
+Claude sẽ tự tải và đặt vào đúng chỗ. Muốn cập nhật thì nhắn lại y hệt.
+
+### Cách 2: dán 1 dòng vào Terminal
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/hikari8126/premiere-media-toolkit/main/install.sh | bash
+```
+
+Chạy lại đúng dòng đó để cập nhật. Cấu hình riêng của bạn không bị mất.
+
+### Cách 3: dùng cơ chế plugin (cho ai quen Claude Code)
+
+```bash
+claude plugin marketplace add hikari8126/premiere-media-toolkit
+claude plugin install premiere-media-toolkit
+```
+
+Hoặc gõ trong Claude Code: `/plugin marketplace add hikari8126/premiere-media-toolkit`
+rồi `/plugin install premiere-media-toolkit`. Cập nhật: `/plugin update`.
+
+## Dùng thế nào
+
+Kéo **2 thư mục project** vào ô chat — thư mục cũ và thư mục mới — rồi gõ:
 
 ```
-/plugin marketplace add hikari8126/premiere-media-toolkit
-/plugin install premiere-media-toolkit
+chuyển nhà
 ```
 
-Cập nhật về sau: `/plugin update premiere-media-toolkit`
+Skill tự nhận ra thư mục nào là đích (theo quy ước đặt tên workspace), tự lập kế
+hoạch và cho bạn xem trước khi động vào file nào. Không cần nói rõ việc cần làm.
+
+Kèm thêm file `.prproj` / `.aep` nếu muốn relink luôn.
+
+## Gỡ
+
+Xoá thư mục `~/.claude/skills/premiere-media-toolkit`. Cấu hình ở
+`~/.claude/premiere-media-toolkit/` giữ lại hay xoá tuỳ bạn.
 
 ## Làm được gì
 
@@ -48,12 +85,9 @@ hay xem dry-run thấy hợp lý rồi `--apply` theo quán tính.
 
 ## Tuỳ biến
 
-```bash
-mkdir -p ~/.claude/premiere-media-toolkit
-cp skills/premiere-media-toolkit/config.example.json ~/.claude/premiere-media-toolkit/config.json
-```
+Trình cài đã tạo sẵn `~/.claude/premiere-media-toolkit/config.json`. Sửa file đó.
 
-Để config ở đó — **ngoài thư mục plugin** — thì `/plugin update` không xoá mất.
+Nó nằm **ngoài** thư mục skill nên cập nhật bao nhiêu lần cũng không mất.
 
 Tuỳ biến được: ngôn ngữ trả lời, tên thư mục theo quy ước của team, marker nhận
 diện workspace đích, vùng cấm ghi, đích cho từng loại resource, cache Adobe nào
