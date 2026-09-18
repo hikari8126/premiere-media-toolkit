@@ -1,0 +1,14 @@
+# Cấu hình cá nhân — mỗi người một bản, KHÔNG commit
+config.json
+
+__pycache__/
+*.pyc
+.DS_Store
+*.skill
+
+# Report/manifest sinh ra khi chạy
+copy_plan.csv
+relink_map.csv
+manifest*.csv
+copy_result*.csv
+*_report.csv

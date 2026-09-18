@@ -1,0 +1,13 @@
+{
+  "name": "premiere-media-toolkit",
+  "owner": {
+    "name": "Crossian"
+  },
+  "plugins": [
+    {
+      "name": "premiere-media-toolkit",
+      "source": "./",
+      "description": "Chuyển nhà thư mục làm việc dựng video: chuyển nốt phần còn thiếu sang workspace mới và relink Premiere (.prproj) + After Effects (.aep) về đường dẫn mới."
+    }
+  ]
+}

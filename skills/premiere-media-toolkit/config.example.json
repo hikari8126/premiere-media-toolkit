@@ -1,0 +1,95 @@
+{
+  "_doc": "Copy file này thành config.json rồi sửa. Xoá field nào không cần — thiếu field thì skill dùng mặc định. Đọc references/CUSTOMIZE.md để biết chi tiết.",
+  "user": {
+    "name": "",
+    "reply_language": "vi",
+    "_reply_language": "vi | en | auto. 'auto' = trả lời theo ngôn ngữ user đang dùng."
+  },
+  "project_structure": {
+    "source_dir_names": [
+      "Source",
+      "Sources"
+    ],
+    "editing_dir_names": [
+      "Editing File",
+      "Project",
+      "Editing"
+    ],
+    "_doc": "Tên thư mục để auto-detect khi user chỉ đưa tên project. Xét theo thứ tự, không phân biệt hoa thường."
+  },
+  "role_detection": {
+    "_doc": "Tự nhận diện thư mục nào là NGUỒN (A) và ĐÍCH (B) theo dấu hiệu trong đường dẫn, để không phải hỏi lại. Khớp không phân biệt hoa thường, so trên toàn bộ path. Nếu cả hai path đều khớp cùng vai, hoặc không path nào khớp, skill PHẢI hỏi lại chứ không được đoán.",
+    "b_markers": [
+      "samx"
+    ],
+    "_b_markers": "path chứa bất kỳ chuỗi nào ở đây = thư mục ĐÍCH (B, đã organize lại).",
+    "a_markers": [],
+    "_a_markers": "path chứa bất kỳ chuỗi nào ở đây = thư mục NGUỒN (A). Để rỗng thì path còn lại tự là A.",
+    "announce": true,
+    "_announce": "true = luôn in rõ 'A = ... / B = ...' trước khi chạy, để user kịp phát hiện nếu nhận diện sai."
+  },
+  "guards": {
+    "_doc": "Chặn cứng mọi thao tác GHI vào source chuẩn của workspace. Áp dụng cho TẤT CẢ script, không lách được bằng --apply hay --overwrite. Chỉ tắt khi thật sự cần.",
+    "enabled": true,
+    "protect_markers": [
+      "samx"
+    ],
+    "_protect_markers": "Workspace nào được bảo vệ. Mặc định lấy theo role_detection.b_markers nếu không khai báo.",
+    "protect_subdirs": [
+      "Sources",
+      "Source"
+    ],
+    "_protect_subdirs": "Tên thư mục source cần bảo vệ, tính từ gốc project của workspace (tối đa 2 cấp).",
+    "output_dirs": [
+      "Asset",
+      "Assets",
+      "Output"
+    ],
+    "_output_dirs": "Thư mục output của skill — luôn ghi được, kể cả khi bên trong có thư mục con tên 'Source' copy từ cây nguồn.",
+    "protect_paths": [],
+    "_protect_paths": "Danh sách đường dẫn tuyệt đối cần bảo vệ thêm, ngoài quy tắc marker."
+  },
+  "structure": {
+    "_doc": "GIỮ NGUYÊN cấu trúc thư mục, không phân loại lại. Taxonomy của team đã nằm sẵn trong tên thư mục; mọi bảng mapping tự đoán đều sai với thư mục chưa gặp.",
+    "sweep_non_video": true,
+    "_sweep_non_video": "true = copy NGUYÊN các folder không phải video (BGM, SFX, Image, VO..., kể cả file project không dùng tới), giữ nguyên cây thư mục.",
+    "non_video_dest": "Asset",
+    "_non_video_dest": "Resource không phải video → <B>/Asset/<đường dẫn con giữ nguyên>.",
+    "extra_video_dest": "Asset/shared",
+    "_extra_video_dest": "Video mà Sources của workspace CHƯA có → vào đây, giữ nguyên đường dẫn con.",
+    "external_dest": "Asset/shared",
+    "_external_dest": "File mượn từ project khác → vào đây, giữ nguyên đường dẫn từ 'Shared drives/'."
+  },
+  "editing_file": {
+    "_doc": "Chuyển kèm thư mục Editing File (autosave, masks/fills, voice, composer) — BỎ cache Adobe tự sinh lại được.",
+    "copy": true,
+    "dest": "Asset/project/Editing File",
+    "skip_subdirs": [
+      "Adobe Premiere Pro Audio Previews",
+      "Adobe Premiere Pro Video Previews"
+    ],
+    "_skip_subdirs": "Cache Premiere tự sinh lại; với ProjectX chúng chiếm 7,9/11,9 GB. Thêm tên thư mục vào đây nếu muốn bỏ thêm."
+  },
+  "output_folder": {
+    "_doc": "Thư mục Output (file đã render). Mặc định KHÔNG chuyển vì không được project tham chiếu, và cấu trúc hai bên thường lệch nhau.",
+    "copy": false,
+    "dest": "Output"
+  },
+  "behavior": {
+    "dedupe_by_default": true,
+    "_dedupe_by_default": "true = tự hash để phát hiện file B đã có dưới tên khác, tránh copy trùng. Chậm trên Google Drive.",
+    "forceful_pname": true,
+    "_forceful_pname": "true = luôn ghi đè tên hiển thị theo tên file. false = giữ nhãn user tự đặt trong Premiere/AE.",
+    "drive_role": "content_manager",
+    "_drive_role": "content_manager | contributor. 'contributor' = ghi được nhưng KHÔNG xoá được, skill sẽ tự thêm --no-delete-dest.",
+    "confirm_before_write": true,
+    "_confirm_before_write": "true = luôn dry-run và chờ user duyệt trước khi ghi/copy.",
+    "_mode": "Luôn COPY (không bao giờ move/xoá ở nguồn). File relink mới luôn đặt trong workspace đích. Đây là mặc định chốt, skill không hỏi lại."
+  },
+  "output": {
+    "project_subdir": "Asset/project",
+    "_project_subdir": "Nơi đặt file .prproj/.aep sau khi relink, tính từ gốc thư mục B.",
+    "keep_reports": true,
+    "_keep_reports": "true = copy kèm các file _*_report.csv để tra cứu về sau."
+  }
+}
