@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
 # Cài / cập nhật skill "chuyển nhà" cho Claude Code.
 # Dùng:  curl -fsSL https://raw.githubusercontent.com/hikari8126/premiere-media-toolkit/main/install.sh | bash
-# Gỡ:    ~/.claude/skills/premiere-media-toolkit  → xoá thư mục này là xong.
+# Gỡ bản cũ cài bằng file .skill:  thêm --remove-old vào cuối lệnh
+# Gỡ hẳn:  xoá ~/.claude/skills/premiere-media-toolkit
 
 set -euo pipefail
 
@@ -9,6 +10,8 @@ REPO="hikari8126/premiere-media-toolkit"
 NAME="premiere-media-toolkit"
 DEST="$HOME/.claude/skills/$NAME"
 CFG_DIR="$HOME/.claude/$NAME"
+REMOVE_OLD=0
+for a in "$@"; do [ "$a" = "--remove-old" ] && REMOVE_OLD=1; done
 TMP="$(mktemp -d)"
 trap 'rm -rf "$TMP"' EXIT
 
@@ -49,6 +52,30 @@ if [ -f "$CFG_DIR/config.json" ]; then
 else
   cp "$DEST/config.example.json" "$CFG_DIR/config.json"
   say "tạo cấu hình mặc định: $CFG_DIR/config.json"
+fi
+
+# 4. tìm bản cũ cài bằng đường khác (file .skill, app tự quản lý)
+OLD=()
+while IFS= read -r d; do
+  [ "$d" = "$DEST" ] && continue
+  OLD+=("$d")
+done < <(find "$HOME/.claude" "$HOME/Library/Application Support/Claude" \
+           -maxdepth 9 -type d -name "$NAME" 2>/dev/null \
+           | grep -v "^$CFG_DIR$" || true)
+
+if [ ${#OLD[@]} -gt 0 ]; then
+  echo
+  if [ "$REMOVE_OLD" = "1" ]; then
+    echo "Gỡ ${#OLD[@]} bản cũ:"
+    for d in "${OLD[@]}"; do rm -rf "$d" && say "đã xoá $d"; done
+  else
+    echo "⚠️  Tìm thấy ${#OLD[@]} bản cũ cài bằng đường khác:"
+    for d in "${OLD[@]}"; do say "$d"; done
+    echo
+    echo "   Hai bản trùng tên khác scope có thể làm Claude nạp nhầm bản cũ."
+    echo "   Gỡ bằng cách chạy lại lệnh cài kèm --remove-old, ví dụ:"
+    echo "     curl -fsSL https://raw.githubusercontent.com/$REPO/main/install.sh | bash -s -- --remove-old"
+  fi
 fi
 
 VER="$(python3 -c "import json,sys;print(json.load(open('$TMP/repo/.claude-plugin/plugin.json'))['version'])" 2>/dev/null || echo "?")"

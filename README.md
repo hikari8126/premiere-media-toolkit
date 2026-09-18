@@ -25,6 +25,13 @@ curl -fsSL https://raw.githubusercontent.com/hikari8126/premiere-media-toolkit/m
 
 Chạy lại đúng dòng đó để cập nhật. Cấu hình riêng của bạn không bị mất.
 
+**Nếu bạn từng cài bản cũ bằng file `.skill`**, trình cài sẽ phát hiện và báo.
+Hai bản trùng tên khác scope có thể làm Claude nạp nhầm bản cũ, nên gỡ đi:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/hikari8126/premiere-media-toolkit/main/install.sh | bash -s -- --remove-old
+```
+
 ### Cách 3: dùng cơ chế plugin (cho ai quen Claude Code)
 
 ```bash
@@ -48,10 +55,14 @@ hoạch và cho bạn xem trước khi động vào file nào. Không cần nói
 
 Kèm thêm file `.prproj` / `.aep` nếu muốn relink luôn.
 
-## Gỡ
+## Cập nhật & gỡ
 
-Xoá thư mục `~/.claude/skills/premiere-media-toolkit`. Cấu hình ở
-`~/.claude/premiere-media-toolkit/` giữ lại hay xoá tuỳ bạn.
+| Việc | Cách |
+|---|---|
+| Cập nhật | chạy lại đúng lệnh cài (cách 1 hoặc 2). Ghi đè bản cũ, **giữ nguyên cấu hình** |
+| Gỡ bản cài bằng `.skill` trước đây | thêm `--remove-old` vào lệnh cài |
+| Gỡ hẳn | xoá `~/.claude/skills/premiere-media-toolkit` |
+| Gỡ cả cấu hình | xoá thêm `~/.claude/premiere-media-toolkit` |
 
 ## Làm được gì
 
