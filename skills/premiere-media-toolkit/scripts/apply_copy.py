@@ -53,6 +53,10 @@ def main():
                          'ghi trực tiếp vào tên cuối, không dùng file tạm .part, '
                          'không dọn file lỗi. Bắt buộc dùng cờ này khi đích là '
                          'shared drive mà ta chỉ có quyền thêm/sửa.')
+    ap.add_argument('--retry', type=int, default=3,
+                    help='số lần thử lại khi lỗi tạm thời (timeout mạng, I/O). '
+                         'Mặc định 3. Drive hay timeout giữa chừng, để 0 là bỏ '
+                         'lại file dở dang.')
     ap.add_argument('--log', default='copy_result.csv')
     ap.add_argument('--guard-config', default=None,
                     help='config.json chứa guards.* (mặc định tự tìm)')
@@ -131,35 +135,55 @@ def main():
     for i, r in enumerate(todo, 1):
         src, dest = r['src'], r['dest']
         d = Path(dest)
-        try:
-            guard.assert_writable(dest, gcfg, 'copy')
-            d.parent.mkdir(parents=True, exist_ok=True)
-            t0 = time.time()
-            if not uses_part(dest):
-                # Ghi thẳng tên cuối (đích đám mây, hoặc không có quyền xoá).
-                # Nếu ngắt giữa đường, file dở dang sẽ bị phát hiện ở lần chạy
-                # sau (size lệch → CONFLICT) chứ không âm thầm coi là xong.
-                shutil.copy2(src, dest)
-                ssz, tsz = os.path.getsize(src), os.path.getsize(dest)
-                if ssz != tsz:
-                    raise IOError(f"size lệch sau copy: {ssz} != {tsz} "
-                                  f"(KHÔNG xoá được file dở — cần người có "
-                                  f"quyền Content manager dọn: {dest})")
-            else:
-                tmp = d.with_name(d.name + '.part')
-                shutil.copy2(src, tmp)
-                ssz, tsz = os.path.getsize(src), os.path.getsize(tmp)
-                if ssz != tsz:
-                    tmp.unlink(missing_ok=True)
-                    raise IOError(f"size lệch sau copy: {ssz} != {tsz}")
-                os.replace(tmp, dest)
-            dt = time.time() - t0
-            copied += 1; moved_bytes += ssz
-            w.writerow(['COPIED', src, dest, ssz, f"{dt:.1f}"])
-        except Exception as e:
-            failed += 1
-            w.writerow(['FAILED', src, dest, r['size'], str(e)])
-            print(f"  LỖI {Path(src).name}: {e}", file=sys.stderr)
+        # Lỗi tạm thời hay gặp trên thư mục đồng bộ đám mây: Errno 60
+        # (timed out), 35 (resource temporarily unavailable), 5 (I/O error).
+        # Không thử lại thì file nằm dở dang ở đích, và lần chạy sau báo
+        # CONFLICT size chứ không tự sửa.
+        TRANSIENT = {60, 35, 5, 11}
+        attempt = 0
+        while True:
+            attempt += 1
+            try:
+                guard.assert_writable(dest, gcfg, 'copy')
+                d.parent.mkdir(parents=True, exist_ok=True)
+                t0 = time.time()
+                if not uses_part(dest):
+                    # Ghi thẳng tên cuối (đích đám mây, hoặc không có quyền xoá).
+                    shutil.copy2(src, dest)
+                    ssz, tsz = os.path.getsize(src), os.path.getsize(dest)
+                    if ssz != tsz:
+                        raise IOError(f"size lệch sau copy: {ssz} != {tsz}")
+                else:
+                    tmp = d.with_name(d.name + '.part')
+                    shutil.copy2(src, tmp)
+                    ssz, tsz = os.path.getsize(src), os.path.getsize(tmp)
+                    if ssz != tsz:
+                        tmp.unlink(missing_ok=True)
+                        raise IOError(f"size lệch sau copy: {ssz} != {tsz}")
+                    os.replace(tmp, dest)
+                dt = time.time() - t0
+                copied += 1; moved_bytes += ssz
+                w.writerow(['COPIED', src, dest, ssz, f"{dt:.1f}"])
+                break
+            except SystemExit:
+                raise
+            except Exception as e:
+                errno = getattr(e, 'errno', None)
+                if errno in TRANSIENT and attempt <= args.retry:
+                    print(f"  thử lại {attempt}/{args.retry} "
+                          f"({Path(src).name[:40]}): {e}", file=sys.stderr)
+                    # xoá phần đã ghi dở để lần sau không báo CONFLICT
+                    try:
+                        if not uses_part(dest) and os.path.exists(dest):
+                            os.remove(dest)
+                    except OSError:
+                        pass
+                    time.sleep(3 * attempt)
+                    continue
+                failed += 1
+                w.writerow(['FAILED', src, dest, r['size'], str(e)])
+                print(f"  LỖI {Path(src).name}: {e}", file=sys.stderr)
+                break
         if i % 25 == 0 or i == len(todo):
             el = time.time() - t_all
             rate = moved_bytes / el if el else 0

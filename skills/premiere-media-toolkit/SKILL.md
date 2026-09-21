@@ -692,6 +692,17 @@ làm assert, và test trên .aep có folder lồng nhiều cấp trước khi ti
   đã nhận trên cloud. Trước khi báo "xong" cho user, đếm số file thiếu item-id.
   File kẹt thì ghi lại (xoá rồi copy thẳng) là Drive nhận ngay.
 
+- **Timeout khi đọc Drive là chuyện thường, PHẢI thử lại.** Job CurvyFlex có
+  45/703 file lỗi `Errno 60 Operation timed out`. Vì đích đám mây ghi thẳng tên
+  thật (không dùng `.part`), timeout để lại file CỤT đúng tên đó — lần chạy sau
+  báo `XUNG ĐỘT size` chứ không tự sửa. `apply_copy.py --retry 3` (mặc định) tự
+  thử lại với `Errno 60/35/5/11`, chờ tăng dần, và xoá phần ghi dở trước mỗi
+  lần thử.
+- **Copy lỗi giữa chừng mà relink vẫn chạy = project trỏ vào chỗ trống.** Chuỗi
+  tự động chạy relink ngay sau copy, nên nếu copy có file FAILED thì phải copy
+  lại cho đủ RỒI mới tin kết quả relink. Luôn kết thúc bằng kiểm
+  "0 đường dẫn trỏ vào đích mà thiếu file".
+
 ### Pitfall chung
 
 - **OOM trên file lớn**: `relink_premiere_v2.py` MUST dùng streaming bytes (đã built-in). Đừng refactor sang ElementTree — sẽ crash trên .prproj > 500MB.
