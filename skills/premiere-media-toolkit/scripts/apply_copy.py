@@ -42,6 +42,12 @@ def main():
                     help='chỉ copy bucket này (lặp được)')
     ap.add_argument('--overwrite', action='store_true',
                     help='ghi đè cả khi dest đã có size khác (mặc định: KHÔNG)')
+    ap.add_argument('--part-file', choices=['auto', 'always', 'never'], default='auto',
+                    help="Ghi qua file tạm .part rồi đổi tên (an toàn khi bị ngắt) "
+                         "hay ghi thẳng tên thật. auto (mặc định) = ghi thẳng khi "
+                         "đích nằm trên Google Drive, vì Drive bắt đầu upload ngay "
+                         "file .part rồi MẤT DẤU khi ta đổi tên — file thật không "
+                         "bao giờ được upload.")
     ap.add_argument('--no-delete-dest', action='store_true',
                     help='đích KHÔNG cho xoá (vd Google Drive role Contributor): '
                          'ghi trực tiếp vào tên cuối, không dùng file tạm .part, '
@@ -90,6 +96,22 @@ def main():
         print("\nDry-run. Thêm --apply để copy thật.")
         return
 
+    # Google Drive (và các FileProvider tương tự) theo dõi file theo từng thao
+    # tác ghi. Ghi ra '<tên>.part' rồi rename làm Drive upload dở file .part rồi
+    # mất dấu; file thật không được xếp hàng upload, .part thì rơi vào
+    # lost-and-found. Đã xảy ra thật: 4 file (3,7 GB) không lên cloud.
+    def uses_part(dest):
+        if args.part_file == 'always':
+            return True
+        if args.part_file == 'never' or args.no_delete_dest:
+            return False
+        low = dest.lower()
+        return not ('/cloudstorage/' in low or '/google drive' in low
+                    or '/onedrive' in low or '/dropbox' in low)
+
+    if rows and not uses_part(rows[0]['dest']):
+        print("  (đích là thư mục đồng bộ đám mây → ghi thẳng, không dùng .part)")
+
     log = open(args.log, 'w', newline='', encoding='utf-8')
     w = csv.writer(log); w.writerow(['status', 'src', 'dest', 'bytes', 'sec'])
     for r in done:
@@ -113,10 +135,10 @@ def main():
             guard.assert_writable(dest, gcfg, 'copy')
             d.parent.mkdir(parents=True, exist_ok=True)
             t0 = time.time()
-            if args.no_delete_dest:
-                # Không có quyền xoá: ghi thẳng tên cuối. Nếu ngắt giữa đường,
-                # file dở dang sẽ bị phát hiện ở lần chạy sau (size lệch →
-                # CONFLICT) chứ không âm thầm coi là xong.
+            if not uses_part(dest):
+                # Ghi thẳng tên cuối (đích đám mây, hoặc không có quyền xoá).
+                # Nếu ngắt giữa đường, file dở dang sẽ bị phát hiện ở lần chạy
+                # sau (size lệch → CONFLICT) chứ không âm thầm coi là xong.
                 shutil.copy2(src, dest)
                 ssz, tsz = os.path.getsize(src), os.path.getsize(dest)
                 if ssz != tsz:

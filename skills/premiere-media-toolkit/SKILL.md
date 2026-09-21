@@ -636,6 +636,19 @@ làm assert, và test trên .aep có folder lồng nhiều cấp trước khi ti
   tự giải `..` khi copy nên file rơi vào thư mục khác **mà không báo lỗi gì**.
   `os.path.normpath` cho cả path nguồn lẫn đích.
 
+- **ĐỪNG ghi qua file tạm `.part` khi đích là thư mục đồng bộ đám mây.** Google
+  Drive theo dõi theo từng thao tác ghi: nó bắt đầu upload ngay file `.part`,
+  rồi khi ta đổi tên thành tên thật thì Drive MẤT DẤU — file thật không bao giờ
+  được xếp hàng upload, còn `.part` rơi vào lost-and-found. Trên máy thì file
+  trông như đã copy xong, `ls` thấy đủ, nhưng đồng nghiệp mở Drive thì KHÔNG
+  THẤY GÌ. Đã xảy ra thật: 4 file lớn nhất (3,7 GB) đứng im hơn một ngày.
+  `apply_copy.py --part-file auto` (mặc định) tự ghi thẳng khi đích nằm trong
+  `/CloudStorage/`, `Google Drive`, `OneDrive`, `Dropbox`.
+- **Copy xong KHÔNG có nghĩa là đã upload.** Kiểm bằng xattr:
+  `xattr <file> | grep com.google.drivefs.item-id` — có item-id nghĩa là Drive
+  đã nhận trên cloud. Trước khi báo "xong" cho user, đếm số file thiếu item-id.
+  File kẹt thì ghi lại (xoá rồi copy thẳng) là Drive nhận ngay.
+
 ### Pitfall chung
 
 - **OOM trên file lớn**: `relink_premiere_v2.py` MUST dùng streaming bytes (đã built-in). Đừng refactor sang ElementTree — sẽ crash trên .prproj > 500MB.
