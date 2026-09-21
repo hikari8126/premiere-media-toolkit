@@ -114,8 +114,9 @@ hash) trừ khi user hỏi · không emoji · không "Chào bạn!".
 
 ## Mẫu trả lời chuẩn — DÁN NGUYÊN VĂN
 
-`plan_relink_b.py` in ra một khối `BÁO CÁO CHUYỂN NHÀ` ở cuối. **Dán nguyên văn
-khối đó vào câu trả lời**, trong code block. Không viết lại bằng lời của mình,
+Hai script in ra khối báo cáo cố định: `find_project.py` → `BÁO CÁO DÒ THƯ MỤC`,
+`plan_relink_b.py` → `BÁO CÁO CHUYỂN NHÀ`. **Dán nguyên văn khối đó vào câu trả
+lời**, trong code block. Không viết lại bằng lời của mình,
 không đổi thứ tự, không thêm bớt số liệu.
 
 Lý do: cùng một kết quả thì mọi session phải cho ra cùng câu chữ. User đọc quen
@@ -130,6 +131,15 @@ Sau khối báo cáo, Claude chỉ được viết thêm **tối đa 3 câu**, v
 
 Cấm: tóm tắt lại con số đã có trong báo cáo · đánh giá kiểu "kết quả rất tốt" ·
 thêm emoji · đổi cách gọi tên mục.
+
+### Sau bước dò thư mục
+
+Dán khối `BÁO CÁO DÒ THƯ MỤC`, rồi đúng một câu:
+
+> Đúng thư mục thì tôi dựng kế hoạch.
+
+Script thoát mã 3 (không chốt được nguồn–đích) thì dán khối đó rồi hỏi user chỉ
+rõ 2 thư mục. KHÔNG tự chọn một ứng viên.
 
 ### Khi báo cáo ghi "KHÔNG CÓ BẤT THƯỜNG"
 

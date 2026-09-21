@@ -158,39 +158,70 @@ def main():
         print("Thử tên ngắn hơn, hoặc đưa thẳng đường dẫn 2 thư mục.")
         sys.exit(2)
 
-    print(f"=== Tìm '{args.query}' — {len(hits)} kết quả ===")
-    for h in hits:
-        print(f"  [{h['role']}] {h['drive']} / {h['name']}")
-
     dests = [h for h in hits if h['role'] == 'ĐÍCH']
     srcs = [h for h in hits if h['role'] == 'nguồn']
 
+    W = 68
+    print("=" * W)
+    print("BÁO CÁO DÒ THƯ MỤC")
+    print("=" * W)
+    print(f"Sản phẩm : {args.query}")
+    print(f"Tìm thấy : {len(srcs)} nguồn, {len(dests)} đích")
+    for h in hits:
+        print(f"  [{h['role']:>5}] {h['drive']} / {h['name']}")
+
     if len(dests) != 1 or len(srcs) != 1:
-        print()
-        print("KHÔNG tự chốt được cặp nguồn/đích "
-              f"({len(srcs)} nguồn, {len(dests)} đích).")
-        print("→ Hỏi user chọn, đừng đoán.")
+        print("-" * W)
+        print("KHÔNG CHỐT ĐƯỢC CẶP NGUỒN–ĐÍCH")
+        if not dests:
+            print(f"  không thư mục nào khớp marker {markers} (workspace đích)")
+        if not srcs:
+            print("  không thấy thư mục nguồn")
+        if len(dests) > 1 or len(srcs) > 1:
+            print("  có nhiều hơn một ứng viên, cần user chọn")
+        print("-" * W)
+        print("CHƯA LÀM GÌ. Cần user chỉ rõ 2 thư mục.")
+        print("=" * W)
         sys.exit(3)
 
     a, b = srcs[0]['path'], dests[0]['path']
-    print(f"\nNGUỒN : {a}\nĐÍCH  : {b}")
-
     pf = project_files(a)
-    print(f"\nthư mục editing: {pf['editing_dir'] or 'KHÔNG THẤY'}")
-    for k, label in (('prproj', '.prproj'), ('aep', '.aep')):
-        if pf[k]:
-            print(f"  {label} — dùng ({len(pf[k])}, mới nhất trước):")
-            for f in pf[k]:
-                print(f"    {os.path.basename(f)}")
-        else:
-            print(f"  {label}: không có file nào ở gốc thư mục editing")
     nphu = len(pf['prproj_phu']) + len(pf['aep_phu'])
+
+    print("-" * W)
+    print(f"NGUỒN : {a}")
+    print(f"ĐÍCH  : {b}")
+    print(f"Editing: {pf['editing_dir'] or 'KHÔNG THẤY'}")
+    print("File project sẽ relink:")
+    for k, label in (('prproj', 'prproj'), ('aep', 'aep   ')):
+        if pf[k]:
+            for f in pf[k]:
+                print(f"  {label}  {os.path.basename(f)}")
+        else:
+            print(f"  {label}  (không có)")
     if nphu:
-        print(f"  (bỏ qua {nphu} file trong Auto-Save/Archive — nếu bản đang "
-              f"dùng nằm trong đó thì phải chỉ định tay)")
+        print(f"Bỏ qua {nphu} file trong Auto-Save/Archive")
+
+    flags = []
+    if not pf['editing_dir']:
+        flags.append("không thấy thư mục editing — kiểm lại cấu trúc project")
+    if not pf['prproj']:
+        flags.append("không có .prproj nào ở gốc thư mục editing")
+    if len(pf['prproj']) > 1:
+        flags.append(f"{len(pf['prproj'])} file .prproj — sẽ relink tất cả")
+    if not pf['aep']:
+        flags.append("không có .aep — bỏ qua bước relink After Effects")
+    if flags:
+        print("-" * W)
+        print("CẦN LƯU Ý")
+        for f in flags:
+            print(f"  {f}")
+
+    print("-" * W)
+    print("CHƯA LÀM GÌ. Xác nhận để dựng kế hoạch chuyển nhà.")
+    print("=" * W)
 
     if pf['prproj']:
-        print("\n=== Lệnh chạy ===")
         cmd = ['python3 scripts/plan_relink_b.py',
                f'  --root "{b}"', f'  --root "{a}"']
         for f in pf['prproj']:
@@ -198,6 +229,7 @@ def main():
         for f in pf['aep']:
             cmd.append(f'  --aep "{f}"')
         cmd.append('  --dedupe --outdir <thư mục tạm>')
+        print("\n# lệnh bước tiếp theo:")
         print(' \\\n'.join(cmd))
 
 
