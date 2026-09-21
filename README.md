@@ -25,12 +25,12 @@ curl -fsSL https://raw.githubusercontent.com/hikari8126/premiere-media-toolkit/m
 
 Chạy lại đúng dòng đó để cập nhật. Cấu hình riêng của bạn không bị mất.
 
-**Nếu bạn từng cài bản cũ bằng file `.skill`**, trình cài sẽ phát hiện và báo.
-Hai bản trùng tên khác scope có thể làm Claude nạp nhầm bản cũ, nên gỡ đi:
+Trình cài **tự tìm mọi bản cũ và thay thế**, kể cả bản cài bằng file `.skill`
+trước đây — hai bản trùng tên khác scope sẽ làm Claude nạp nhầm bản cũ. Bản cũ
+được **chuyển vào thư mục backup** (`~/.claude/premiere-media-toolkit/backup-ban-cu/`)
+chứ không xoá thẳng, yên tâm rồi thì xoá đi.
 
-```bash
-curl -fsSL https://raw.githubusercontent.com/hikari8126/premiere-media-toolkit/main/install.sh | bash -s -- --remove-old
-```
+Muốn giữ nguyên bản cũ thì thêm `--keep-old`.
 
 ### Cách 3: dùng cơ chế plugin (cho ai quen Claude Code)
 
@@ -60,7 +60,8 @@ Kèm thêm file `.prproj` / `.aep` nếu muốn relink luôn.
 | Việc | Cách |
 |---|---|
 | Cập nhật | chạy lại đúng lệnh cài (cách 1 hoặc 2). Ghi đè bản cũ, **giữ nguyên cấu hình** |
-| Gỡ bản cài bằng `.skill` trước đây | thêm `--remove-old` vào lệnh cài |
+| Gỡ bản cài bằng `.skill` trước đây | tự động, bản cũ chuyển vào `~/.claude/premiere-media-toolkit/backup-ban-cu/` |
+| Giữ lại bản cũ | thêm `--keep-old` vào lệnh cài |
 | Gỡ hẳn | xoá `~/.claude/skills/premiere-media-toolkit` |
 | Gỡ cả cấu hình | xoá thêm `~/.claude/premiere-media-toolkit` |
 

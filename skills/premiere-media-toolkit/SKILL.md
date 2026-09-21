@@ -70,6 +70,48 @@ Cấu hình trong `config.json` → `guards` (xem `references/CUSTOMIZE.md`). T�
 Khi guard chặn, ĐỪNG tìm cách đi vòng. Báo user biết path nào bị chặn và hỏi họ
 muốn đổi đích thế nào.
 
+## Câu mở đầu chuẩn — DÙNG NGUYÊN VĂN
+
+Khi skill vừa được cài/nạp và user CHƯA đưa thư mục nào, trả lời **đúng khối
+dưới đây**, không thêm bớt, không đổi từ, không thêm emoji. Mọi người trong team
+phải thấy cùng một câu chào thì mới biết skill đã nạp đúng.
+
+### 1. Vừa cài xong hoặc user vừa import skill
+
+> Skill **chuyển nhà** đã sẵn sàng.
+>
+> Việc nó làm: chuyển nốt phần còn thiếu của một project sang workspace mới rồi
+> relink Premiere (`.prproj`) và After Effects (`.aep`) về đường dẫn mới, đồng
+> thời sửa tên hiển thị trong Project panel cho khớp.
+>
+> Cách dùng: kéo **2 thư mục project** vào ô chat — thư mục cũ và thư mục mới —
+> rồi gõ `chuyển nhà`. Không cần nói rõ cái nào là nguồn, cái nào là đích.
+>
+> Trước khi ghi bất cứ thứ gì, tôi luôn chạy thử và đưa bạn xem báo cáo.
+
+### 2. User đưa đủ 2 thư mục
+
+Không chào hỏi, vào việc luôn. Câu đầu tiên đúng một dòng:
+
+> Đang dựng kế hoạch chuyển nhà.
+
+Rồi in `A = ... / B = ...` và khối `BÁO CÁO CHUYỂN NHÀ`.
+
+### 3. User mới đưa 1 thư mục
+
+> Mới có một thư mục. Cần thư mục còn lại — bản cũ hoặc bản mới đều được, tôi tự
+> nhận ra cái nào là đích.
+
+### 4. User hỏi skill làm được gì
+
+Dùng nguyên khối ở mục 1.
+
+### Cấm trong mọi câu mở đầu
+
+Không hứa trước kết quả ("sẽ relink sạch sẽ", "đảm bảo không lỗi") · không đoán
+số liệu trước khi chạy · không liệt kê tính năng kỹ thuật (UID chain, RIFX,
+hash) trừ khi user hỏi · không emoji · không "Chào bạn!".
+
 ## Mẫu trả lời chuẩn — DÁN NGUYÊN VĂN
 
 `plan_relink_b.py` in ra một khối `BÁO CÁO CHUYỂN NHÀ` ở cuối. **Dán nguyên văn

@@ -1,8 +1,10 @@
 #!/usr/bin/env bash
 # Cài / cập nhật skill "chuyển nhà" cho Claude Code.
 # Dùng:  curl -fsSL https://raw.githubusercontent.com/hikari8126/premiere-media-toolkit/main/install.sh | bash
-# Gỡ bản cũ cài bằng file .skill:  thêm --remove-old vào cuối lệnh
-# Gỡ hẳn:  xoá ~/.claude/skills/premiere-media-toolkit
+# Mặc định: tự tìm mọi bản cũ và THAY THẾ (bản cũ được chuyển vào thư mục
+#            backup, không xoá thẳng — xem đường dẫn in ra cuối màn hình).
+# Giữ bản cũ:  thêm --keep-old
+# Gỡ hẳn:      xoá ~/.claude/skills/premiere-media-toolkit
 
 set -euo pipefail
 
@@ -10,8 +12,12 @@ REPO="hikari8126/premiere-media-toolkit"
 NAME="premiere-media-toolkit"
 DEST="$HOME/.claude/skills/$NAME"
 CFG_DIR="$HOME/.claude/$NAME"
-REMOVE_OLD=0
-for a in "$@"; do [ "$a" = "--remove-old" ] && REMOVE_OLD=1; done
+REPLACE_OLD=1        # mặc định: thay thế bản cũ
+for a in "$@"; do
+  [ "$a" = "--keep-old" ] && REPLACE_OLD=0
+  [ "$a" = "--remove-old" ] && REPLACE_OLD=1   # giữ tương thích lệnh cũ
+done
+BACKUP="$HOME/.claude/premiere-media-toolkit/backup-ban-cu/$(date +%Y%m%d-%H%M%S)"
 TMP="$(mktemp -d)"
 trap 'rm -rf "$TMP"' EXIT
 
@@ -65,16 +71,32 @@ done < <(find "$HOME/.claude" "$HOME/Library/Application Support/Claude" \
 
 if [ ${#OLD[@]} -gt 0 ]; then
   echo
-  if [ "$REMOVE_OLD" = "1" ]; then
-    echo "Gỡ ${#OLD[@]} bản cũ:"
-    for d in "${OLD[@]}"; do rm -rf "$d" && say "đã xoá $d"; done
+  if [ "$REPLACE_OLD" = "1" ]; then
+    echo "Tìm thấy ${#OLD[@]} bản cũ cài bằng đường khác → thay thế:"
+    mkdir -p "$BACKUP"
+    moved=0
+    for d in "${OLD[@]}"; do
+      # chuyển vào backup thay vì xoá, để còn đường lùi
+      tgt="$BACKUP/$(echo "$d" | tr '/' '_')"
+      if mv "$d" "$tgt" 2>/dev/null; then
+        say "đã chuyển đi: $d"
+        moved=$((moved+1))
+      else
+        say "KHÔNG chuyển được (bỏ qua): $d"
+      fi
+    done
+    if [ "$moved" -gt 0 ]; then
+      echo
+      say "bản cũ nằm ở: $BACKUP"
+      say "yên tâm rồi thì xoá thư mục đó đi"
+    else
+      rmdir "$BACKUP" 2>/dev/null || true
+    fi
   else
-    echo "⚠️  Tìm thấy ${#OLD[@]} bản cũ cài bằng đường khác:"
+    echo "⚠️  Tìm thấy ${#OLD[@]} bản cũ, ĐANG GIỮ LẠI theo --keep-old:"
     for d in "${OLD[@]}"; do say "$d"; done
     echo
     echo "   Hai bản trùng tên khác scope có thể làm Claude nạp nhầm bản cũ."
-    echo "   Gỡ bằng cách chạy lại lệnh cài kèm --remove-old, ví dụ:"
-    echo "     curl -fsSL https://raw.githubusercontent.com/$REPO/main/install.sh | bash -s -- --remove-old"
   fi
 fi
 
