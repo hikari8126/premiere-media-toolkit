@@ -36,7 +36,7 @@ ngôn ngữ đã chọn.
 | 2 thư mục project | chuyển nhà — thư mục khớp marker (`samx`) là ĐÍCH, cái còn lại là NGUỒN |
 | 2 thư mục + `.prproj`/`.aep` | chuyển nhà, relink luôn các project file đó |
 | 1 thư mục + `.prproj` | thiếu vế kia — hỏi thư mục còn lại |
-| "chuyển nhà <tên project>" | tự dò 2 thư mục theo tên, xác nhận với user trước khi chạy |
+| "chuyển nhà sản phẩm X" / "chuyển nhà X" | chạy `find_project.py X` để dò 2 thư mục, xác nhận rồi chạy |
 
 Việc đầu tiên luôn là in ra `A = ... / B = ...` rồi dry-run. Không hỏi lại những
 gì đã có mặc định (xem "Skill KHÔNG cần hỏi").
@@ -253,6 +253,7 @@ Mục tiêu chung: khi sname/spath thay đổi (do organize), pname/ppath cũng 
 Luồng chuyển nhà chạy theo thứ tự này:
 
 ```
+find_project.py   →  (nếu user chỉ đưa tên sản phẩm)
 plan_relink_b.py  →  apply_copy.py  →  emit_manifest.py
                   →  relink_premiere_v2.py  →  fix_residual_prproj.py
                   →  relink_aep.py
@@ -454,7 +455,38 @@ Output: `<project>.RELINKED.aep` + `<project>.ORIGINAL.BACKUP.aep` + `<project>.
 
 **Khi nào dùng**: sau `relink_premiere_v2.py`, nếu project có cả AE thì chạy thêm `relink_aep.py` cho mỗi file `.aep` cần đồng bộ, dùng CÙNG manifest.
 
-### 7. build_move_manifest.py — Dựng manifest A→B thuần theo cây thư mục
+### 7. find_project.py — Dò thư mục nguồn/đích theo TÊN SẢN PHẨM
+
+Để user chỉ cần gõ *"chuyển nhà sản phẩm X"*. **Luôn dùng script này, đừng
+chạy `find` đệ quy** — `find` trên Google Drive mất cả phút và hay timeout;
+script chỉ liệt kê ở độ sâu cố định nên xong trong ~0,05 giây.
+
+```
+python3 scripts/find_project.py "CurvyFlex"        # người đọc
+python3 scripts/find_project.py "CurvyFlex" --json # máy đọc
+```
+
+In ra: danh sách project khớp tên (đã gắn nhãn nguồn/ĐÍCH theo marker), cặp
+nguồn–đích nếu chốt được, các file project, và **lệnh `plan_relink_b.py` hoàn
+chỉnh để copy-paste**.
+
+Hai chỗ script cẩn thận thay cho ta:
+
+- **Mount Drive cũ**: macOS để lại mount cũ mỗi lần đăng nhập lại
+  (`GoogleDrive-a@b.com (17-8-26 10:09)`). Máy thật đã có 8 mount cho cùng một
+  tài khoản → mỗi project bị đếm 8 lần. Script ưu tiên mount không có hậu tố
+  ngày và khử trùng lặp theo (drive, project).
+- **Chọn file project theo VỊ TRÍ, không theo TÊN**: chỉ lấy file nằm NGAY
+  trong thư mục editing; bỏ qua `Auto-Save/`, `Archive/` và các file
+  `.RELINKED.`/`.ORIGINAL.BACKUP.` do chính skill sinh ra. CurvyFlex có 69 file
+  loại này. ⚠️ ĐỪNG lọc theo tên chứa "auto-save" — ZipLacy dùng chính
+  `ZipLacy FX auto-save 2.aep` (nằm ở gốc Editing File) làm bản chạy, lọc theo
+  tên là bỏ sót đúng file quan trọng nhất.
+
+Không chốt được cặp nguồn–đích (nhiều hơn 1 mỗi bên, hoặc không có) thì script
+thoát mã 3 và yêu cầu hỏi user — không đoán.
+
+### 8. build_move_manifest.py — Dựng manifest A→B thuần theo cây thư mục
 
 Nhẹ hơn `plan_relink_b.py`: chỉ quét 2 cây thư mục và ghép file, không đọc
 project. Dùng khi cần biết A và B lệch nhau thế nào trước khi quyết định gì.
@@ -467,6 +499,7 @@ python3 scripts/build_move_manifest.py <A_root> <B_root> -o manifest.csv [--ext 
 ## Workflow end-to-end
 
 ```
+0. find_project.py "<tên>"        → dò 2 thư mục + file project (nếu chỉ có tên)
 1. plan_relink_b.py --dedupe      → copy_plan.csv + relink_map.csv
 2. Đọc report: nhóm DEAD có nằm trên timeline không? (xem mục "Truy vết
    media chết" dưới) → quyết định có cần cứu file từ Drive trash không.
