@@ -703,6 +703,23 @@ làm assert, và test trên .aep có folder lồng nhiều cấp trước khi ti
   lại cho đủ RỒI mới tin kết quả relink. Luôn kết thúc bằng kiểm
   "0 đường dẫn trỏ vào đích mà thiếu file".
 
+- **SIZE LÀ ĐIỀU KIỆN LOẠI TRỪ, KHÔNG PHẢI ĐIỂM CỘNG.** Lỗi nghiêm trọng nhất
+  từng có: khi đích có file trùng tên, code lọc theo size, nhưng nếu KHÔNG
+  ứng viên nào khớp size thì vẫn chọn bừa theo đường dẫn gần nhất. Kết quả:
+  `Fiverr/Emma P/1.MOV` (111 MB) bị link sang `model/Daniela Alvarado/1.mov`
+  (153 MB) — khác người, khác nội dung, sequence sai hoàn toàn. Tệ hơn, nó
+  được xếp loại `IN_B:EXACT` nên báo cáo trông như khớp hoàn hảo và KHÔNG
+  cảnh báo gì. Thống kê job thật: ZipLacy 58 ca, SonaShape 14, CurvyFlex 5.
+  Biết size nguồn mà không ứng viên nào khớp → **trả None**, để file được copy
+  từ nguồn. Không biết size mà có nhiều ứng viên → cũng **trả None**.
+- **Soát lại job cũ bằng `audit_relink.py`.** So size nguồn với đích cho từng
+  tham chiếu; lệch size = gần như chắc chắn link nhầm. Chạy sau mỗi job, và
+  chạy lại cho các job đã làm bằng bản skill cũ.
+- **Clip offline còn hơn nội dung sai.** Khi không đối chiếu được (nhiều file
+  trùng tên + file nguồn đã mất), mặc định KHÔNG link. Editor thấy offline là
+  biết ngay; nội dung sai thì có thể lọt tới khách. Đổi bằng
+  `behavior.link_unverifiable = true` nếu chấp nhận rủi ro.
+
 ### Pitfall chung
 
 - **OOM trên file lớn**: `relink_premiere_v2.py` MUST dùng streaming bytes (đã built-in). Đừng refactor sang ElementTree — sẽ crash trên .prproj > 500MB.

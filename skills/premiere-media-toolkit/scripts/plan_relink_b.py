@@ -85,6 +85,8 @@ def csuf(a, b):
 class Index:
     """Index file trong 1 cây thư mục, tra theo basename / loose key."""
 
+    link_unverifiable = False
+
     def __init__(self, root, label):
         self.root = Path(root)
         self.label = label
@@ -123,18 +125,32 @@ class Index:
                      if os.path.splitext(c)[1].lower() == want]
         if not cands:
             return None, None
-        if len(cands) == 1:
-            return cands[0], kind
+        # ---- SIZE LÀ ĐIỀU KIỆN LOẠI TRỪ, KHÔNG PHẢI ĐIỂM CỘNG ----
+        # Biết size nguồn mà KHÔNG ứng viên nào khớp → chúng là file KHÁC,
+        # chỉ trùng tên. Trả None để file được COPY từ nguồn, thay vì link
+        # bừa sang file lạ.
+        #
+        # Đây từng là lỗi nghiêm trọng nhất của skill: 'Fiverr/Emma P/1.MOV'
+        # (111 MB) bị link sang 'model/Daniela Alvarado/1.mov' (153 MB) —
+        # khác người, khác nội dung, sequence sai hoàn toàn mà không báo gì.
         if size is not None and size >= 0:
             same = [c for c in cands if self.size.get(c) == size]
+            if not same:
+                return None, 'SIZE_CONFLICT'
             if len(same) == 1:
                 return same[0], kind + '_SIZE'
-            if same:
-                cands = same
-                kind += '_SIZE'
+            cands = same
+            kind += '_SIZE'
+        elif len(cands) > 1 and not self.link_unverifiable:
+            # Không biết size mà có nhiều ứng viên → không có cơ sở nào để
+            # chọn. Đoán theo đường dẫn là cách sinh ra link sai.
+            # Đổi hành vi bằng behavior.link_unverifiable = true (KHÔNG khuyến
+            # nghị): khi đó vẫn link nhưng gắn nhãn _UNVERIFIED để soát tay.
+            return None, 'UNVERIFIABLE'
+
+        if len(cands) == 1:
+            return cands[0], kind if size is not None else kind + '_UNVERIFIED'
         ranked = sorted(cands, key=lambda r: csuf(p, r), reverse=True)
-        if len(ranked) == 1:
-            return ranked[0], kind
         if csuf(p, ranked[0]) > csuf(p, ranked[1]):
             return ranked[0], kind + '_SUFFIX'
         return ranked[0], kind + '_AMBIGUOUS'
@@ -624,7 +640,12 @@ def main():
     outdir = Path(args.outdir); outdir.mkdir(parents=True, exist_ok=True)
 
     print(f"A = {a_root}\nB = {b_root}\n")
+    Index.link_unverifiable = bool(
+        cfg.get('behavior', {}).get('link_unverifiable', False))
     bi = Index(b_root, 'B'); print(f"B index: {bi.n:,} file")
+    if Index.link_unverifiable:
+        print("  CHÚ Ý: link_unverifiable=true — vẫn link khi không đối chiếu "
+              "được size. Rủi ro nhầm nội dung.")
     ai = Index(a_root, 'A'); print(f"A index: {ai.n:,} file\n")
 
     a_edit = find_subdir(a_root, edit_names)
@@ -635,6 +656,7 @@ def main():
     our_projects = {os.path.basename(x).lower()
                     for x in list(args.prproj) + list(args.aep)}
 
+    name_clash = []   # tham chiếu trùng tên ở đích nhưng khác file
     refs = {}   # path -> set(nguồn)
     for p in args.prproj:
         tags, size = extract_prproj(p)
@@ -699,7 +721,13 @@ def main():
 
         # 2. đã có trong B?
         rel_b, kind = bi.find(p, size=ref_size)
-        if rel_b:
+        if kind in ('SIZE_CONFLICT', 'UNVERIFIABLE'):
+            # Đích CÓ file trùng tên nhưng không xác minh được là cùng nội
+            # dung → KHÔNG link. Cho xuống nhánh copy từ nguồn bên dưới.
+            stats['TRÙNG TÊN KHÁC FILE' if kind == 'SIZE_CONFLICT'
+                  else 'TRÙNG TÊN KHÔNG KIỂM ĐƯỢC'] += 1
+            name_clash.append((p, kind))
+        elif rel_b:
             stats['IN_B_' + kind.split('_')[0]] += 1
             relink_rows.append([p, bi.abs_of(rel_b), 'IN_B:' + kind, ext, srcs]); continue
 
@@ -939,6 +967,19 @@ def main():
     if amb:
         flags.append(("KHỚP MƠ HỒ", f"{amb} tham chiếu trùng tên, đã chọn ứng viên gần nhất",
                       "Kiểm cột status=*AMBIGUOUS* trong relink_map.csv nếu thấy nghi."))
+    n_clash = stats.get('TRÙNG TÊN KHÁC FILE', 0)
+    n_unver = stats.get('TRÙNG TÊN KHÔNG KIỂM ĐƯỢC', 0)
+    if n_clash:
+        flags.append(("TRÙNG TÊN KHÁC FILE",
+                      f"{n_clash:,} tham chiếu có file TRÙNG TÊN ở đích nhưng "
+                      f"KHÁC dung lượng",
+                      "Đã KHÔNG link sang đó — copy bản đúng từ nguồn. Nếu link "
+                      "bừa thì sequence sẽ chạy nhầm nội dung."))
+    if n_unver:
+        flags.append(("TRÙNG TÊN KHÔNG KIỂM ĐƯỢC",
+                      f"{n_unver:,} tham chiếu trùng tên nhưng file nguồn không "
+                      f"còn để đối chiếu",
+                      "Đã KHÔNG link. Kiểm cột status trong relink_map.csv."))
     if maxdepth >= 8:
         flags.append(("CÂY SÂU", f"đích sâu tới {maxdepth} cấp",
                       "Xem lại structure.shared_max_dirs nếu thấy thừa."))

@@ -138,7 +138,9 @@
     "_drive_role": "content_manager | contributor. 'contributor' = ghi được nhưng KHÔNG xoá được, skill sẽ tự thêm --no-delete-dest.",
     "confirm_before_write": true,
     "_confirm_before_write": "true = luôn dry-run và chờ user duyệt trước khi ghi/copy.",
-    "_mode": "Luôn COPY (không bao giờ move/xoá ở nguồn). File relink mới luôn đặt trong workspace đích. Đây là mặc định chốt, skill không hỏi lại."
+    "_mode": "Luôn COPY (không bao giờ move/xoá ở nguồn). File relink mới luôn đặt trong workspace đích. Đây là mặc định chốt, skill không hỏi lại.",
+    "link_unverifiable": false,
+    "_link_unverifiable": "false (mặc định, AN TOÀN) = khi đích có NHIỀU file trùng tên mà file nguồn đã mất nên không đối chiếu size được thì KHÔNG link, để clip offline. true = vẫn link theo đường dẫn gần nhất. Trong dựng phim, clip offline thấy ngay còn nội dung sai có thể lọt tới khách — đã có ca 'Fiverr/Emma P/1.MOV' bị link sang 'Daniela Alvarado/1.mov'."
   },
   "output": {
     "project_subdir": "Asset/project",
