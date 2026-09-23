@@ -720,6 +720,15 @@ làm assert, và test trên .aep có folder lồng nhiều cấp trước khi ti
   biết ngay; nội dung sai thì có thể lọt tới khách. Đổi bằng
   `behavior.link_unverifiable = true` nếu chấp nhận rủi ro.
 
+- **Script phụ ĐỪNG để trong `/tmp`.** macOS dọn `/tmp` khi khởi động lại. Một
+  script chuỗi để ở đó đã biến mất giữa job, và vì gọi kèm `|| true` + pipe qua
+  `grep` nên lỗi "No such file" bị nuốt — log báo chạy xong bình thường trong
+  khi KHÔNG file nào được deploy. Dùng `scripts/relink_chain.sh` trong skill.
+- **Đừng tin log, hãy kiểm file thật ở đích.** Cách phát hiện vụ trên: so
+  `mtime` của file `.prproj` ở đích với thời điểm job chạy. Trùng khớp mới là
+  đã deploy. Kết thúc mọi job bằng: đếm đường dẫn trỏ sang đích, đếm file
+  thiếu, và xem mtime.
+
 ### Pitfall chung
 
 - **OOM trên file lớn**: `relink_premiere_v2.py` MUST dùng streaming bytes (đã built-in). Đừng refactor sang ElementTree — sẽ crash trên .prproj > 500MB.

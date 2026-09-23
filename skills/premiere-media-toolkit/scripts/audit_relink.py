@@ -8,7 +8,11 @@ Dùng để soát lại các job ĐÃ CHẠY, kể cả job chạy bằng bản 
 
     python3 scripts/audit_relink.py <relink_map.csv>
 
-Bỏ qua .aep/.prproj vì bản đã relink khác size bản gốc là đương nhiên.
+Bỏ qua .aep/.prproj (bản relink khác size bản gốc là đương nhiên), đường dẫn
+tương đối, và thư mục.
+
+⚠️ CHẠY SAU KHI COPY XONG. Chạy giữa lúc đang copy sẽ thấy file dở dang và
+báo lệch size nhầm.
 """
 import csv, os, sys, collections
 
@@ -24,6 +28,16 @@ for r in rows:
         skipped += 1
         continue
     if not new or st.startswith(('DEAD', 'SKIP', 'PROJECT_FILE')):
+        skipped += 1
+        continue
+    # Bỏ qua các ca KHÔNG kiểm chứng được, tránh báo động giả:
+    #  - đường dẫn tương đối: getsize sẽ giải theo thư mục làm việc hiện tại
+    #  - thư mục (vd Fills/000000 mà Premiere coi như image sequence):
+    #    getsize trả kích thước THƯ MỤC, lệch nhau là bình thường
+    if not old.startswith('/'):
+        nocheck += 1
+        continue
+    if os.path.isdir(old) or os.path.isdir(new):
         skipped += 1
         continue
     try:
